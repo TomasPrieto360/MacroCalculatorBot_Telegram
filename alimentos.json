@@ -1,0 +1,668 @@
+{
+    "alias": {
+        "pechuga": "pollo",
+        "pata y muslo": "pollo",
+        "bife": "carne",
+        "papas": "papa",
+        "fideos": "pasta",
+        "huevo duro": "huevo",
+        "huevo frito": "huevo",
+        "claras": "huevo",
+        "frutilla": "fresa",
+        "aguacate": "palta",
+        "birra": "cerveza",
+        "morfi": "carne",
+        "manaos": "gaseosa cola",
+        "coca": "gaseosa cola",
+        "sprite": "gaseosa lima limon",
+        "tarta": "masa de tarta",
+        "zapallito": "zucchini",
+        "choclo": "maiz",
+        "poroto": "frijol",
+        "manteca": "mantequilla",
+        "parrilla": "asado",
+        "parrillada": "asado",
+        "achuras": "asado"
+    },
+    "alimentos": {
+        "_sec_parrilla": "🥩 --------------- ASADO Y PARRILLA --------------- 🥩",
+        "asado": {
+            "tira": {
+                "proteinas": 15,
+                "carbos": 0,
+                "grasas": 32,
+                "kcal": 350
+            },
+            "vacio": {
+                "proteinas": 21,
+                "carbos": 0,
+                "grasas": 18,
+                "kcal": 250
+            },
+            "entraña": {
+                "proteinas": 19,
+                "carbos": 0,
+                "grasas": 12,
+                "kcal": 220
+            },
+            "matambre": {
+                "proteinas": 20,
+                "carbos": 0,
+                "grasas": 15,
+                "kcal": 220
+            },
+            "pollo": {
+                "proteinas": 31,
+                "carbos": 0,
+                "grasas": 3.6,
+                "kcal": 165
+            },
+            "chorizo": {
+                "proteinas": 12,
+                "carbos": 2,
+                "grasas": 30,
+                "kcal": 330,
+                "peso_unidad": 120
+            },
+            "morcilla": {
+                "proteinas": 14,
+                "carbos": 1,
+                "grasas": 34,
+                "kcal": 379,
+                "peso_unidad": 100
+            },
+            "provoleta": {
+                "proteinas": 22,
+                "carbos": 2,
+                "grasas": 28,
+                "kcal": 350
+            },
+            "chinchulin": {
+                "proteinas": 14,
+                "carbos": 0,
+                "grasas": 13,
+                "kcal": 175
+            },
+            "molleja": {
+                "proteinas": 13,
+                "carbos": 0,
+                "grasas": 19,
+                "kcal": 225
+            },
+            "riñon": {
+                "proteinas": 16,
+                "carbos": 0,
+                "grasas": 3,
+                "kcal": 95
+            }
+        },
+        "_sec_carnes": "🍗 --------------- OTRAS CARNES Y PESCADOS --------------- 🍗",
+        "pollo": {
+            "proteinas": 31,
+            "carbos": 0,
+            "grasas": 3.6,
+            "kcal": 165
+        },
+        "carne": {
+            "proteinas": 25,
+            "carbos": 0,
+            "grasas": 10,
+            "kcal": 200
+        },
+        "cerdo": {
+            "proteinas": 27,
+            "carbos": 0,
+            "grasas": 14,
+            "kcal": 242
+        },
+        "bondiola": {
+            "proteinas": 15,
+            "carbos": 0,
+            "grasas": 22,
+            "kcal": 260
+        },
+        "jamón": {
+            "proteinas": 15,
+            "carbos": 1,
+            "grasas": 4,
+            "kcal": 100
+        },
+        "atun": {
+            "proteinas": 25,
+            "carbos": 0,
+            "grasas": 1,
+            "kcal": 116
+        },
+        "pescado": {
+            "proteinas": 20,
+            "carbos": 0,
+            "grasas": 5,
+            "kcal": 130
+        },
+        "salmon": {
+            "proteinas": 20,
+            "carbos": 0,
+            "grasas": 13,
+            "kcal": 208
+        },
+        "merluza": {
+            "proteinas": 17,
+            "carbos": 0,
+            "grasas": 2,
+            "kcal": 90
+        },
+        "_sec_lacteos": "🧀 --------------- LÁCTEOS Y HUEVOS --------------- 🧀",
+        "huevo": {
+            "proteinas": 13,
+            "carbos": 1.1,
+            "grasas": 11,
+            "kcal": 155,
+            "peso_unidad": 50
+        },
+        "leche": {
+            "entera": {
+                "proteinas": 3.2,
+                "carbos": 4.8,
+                "grasas": 3.3,
+                "kcal": 61
+            },
+            "descremada": {
+                "proteinas": 3.4,
+                "carbos": 5.0,
+                "grasas": 0.1,
+                "kcal": 35
+            },
+            "de almendras": {
+                "proteinas": 0.5,
+                "carbos": 0.3,
+                "grasas": 1.1,
+                "kcal": 13
+            },
+            "de soja": {
+                "proteinas": 3.3,
+                "carbos": 6.0,
+                "grasas": 1.8,
+                "kcal": 54
+            }
+        },
+        "queso": {
+            "cremoso": {
+                "proteinas": 20,
+                "carbos": 1,
+                "grasas": 24,
+                "kcal": 300
+            },
+            "rallado": {
+                "proteinas": 33,
+                "carbos": 3,
+                "grasas": 28,
+                "kcal": 400
+            },
+            "roquefort": {
+                "proteinas": 21,
+                "carbos": 2,
+                "grasas": 30,
+                "kcal": 369
+            },
+            "pategras": {
+                "proteinas": 25,
+                "carbos": 1,
+                "grasas": 29,
+                "kcal": 367
+            },
+            "muzzarella": {
+                "proteinas": 22,
+                "carbos": 2,
+                "grasas": 22,
+                "kcal": 300
+            },
+            "cheddar": {
+                "proteinas": 25,
+                "carbos": 1.3,
+                "grasas": 33,
+                "kcal": 402
+            },
+            "crema": {
+                "proteinas": 6,
+                "carbos": 4,
+                "grasas": 34,
+                "kcal": 342
+            }
+        },
+        "yogur": {
+            "proteinas": 5,
+            "carbos": 5,
+            "grasas": 0,
+            "kcal": 60
+        },
+        "yogur griego": {
+            "proteinas": 10,
+            "carbos": 4,
+            "grasas": 0.4,
+            "kcal": 59
+        },
+        "mantequilla": {
+            "proteinas": 0.8,
+            "carbos": 0.1,
+            "grasas": 81,
+            "kcal": 717
+        },
+        "dulce de leche": {
+            "proteinas": 7,
+            "carbos": 55,
+            "grasas": 7,
+            "kcal": 315
+        },
+        "_sec_carbohidratos": "🍞 --------------- CARBOHIDRATOS Y CEREALES --------------- 🍞",
+        "arroz": {
+            "blanco": {
+                "proteinas": 2.7,
+                "carbos": 28,
+                "grasas": 0.3,
+                "kcal": 130
+            },
+            "integral": {
+                "proteinas": 2.6,
+                "carbos": 23,
+                "grasas": 0.9,
+                "kcal": 111
+            },
+            "yamani": {
+                "proteinas": 2.6,
+                "carbos": 23,
+                "grasas": 1.1,
+                "kcal": 115
+            }
+        },
+        "pasta": {
+            "seca": {
+                "proteinas": 13,
+                "carbos": 71,
+                "grasas": 1.5,
+                "kcal": 353
+            },
+            "fresca": {
+                "proteinas": 10,
+                "carbos": 55,
+                "grasas": 2,
+                "kcal": 280
+            },
+            "integral": {
+                "proteinas": 14,
+                "carbos": 65,
+                "grasas": 2.5,
+                "kcal": 348
+            }
+        },
+        "harina": {
+            "0000": {
+                "proteinas": 10,
+                "carbos": 73,
+                "grasas": 1,
+                "kcal": 348
+            },
+            "integral": {
+                "proteinas": 13,
+                "carbos": 61,
+                "grasas": 2,
+                "kcal": 339
+            },
+            "de avena": {
+                "proteinas": 14,
+                "carbos": 66,
+                "grasas": 7,
+                "kcal": 404
+            },
+            "leudante": {
+                "proteinas": 9,
+                "carbos": 75,
+                "grasas": 1,
+                "kcal": 350
+            },
+            "de maiz": {
+                "proteinas": 7,
+                "carbos": 79,
+                "grasas": 1,
+                "kcal": 362
+            }
+        },
+        "pan": {
+            "frances": {
+                "proteinas": 9,
+                "carbos": 55,
+                "grasas": 1.5,
+                "kcal": 270
+            },
+            "lactal blanco": {
+                "proteinas": 8,
+                "carbos": 50,
+                "grasas": 3,
+                "kcal": 260,
+                "peso_unidad": 25
+            },
+            "lactal integral": {
+                "proteinas": 10,
+                "carbos": 45,
+                "grasas": 4,
+                "kcal": 250,
+                "peso_unidad": 25
+            },
+            "de hamburguesa": {
+                "proteinas": 9,
+                "carbos": 52,
+                "grasas": 4,
+                "kcal": 277,
+                "peso_unidad": 60
+            }
+        },
+        "_sec_frutas": "🍎 --------------- FRUTAS --------------- 🍎",
+        "manzana": {
+            "proteinas": 0.3,
+            "carbos": 14,
+            "grasas": 0.2,
+            "kcal": 52,
+            "peso_unidad": 150
+        },
+        "banana": {
+            "proteinas": 1.1,
+            "carbos": 23,
+            "grasas": 0.3,
+            "kcal": 89,
+            "peso_unidad": 120
+        },
+        "naranja": {
+            "proteinas": 0.9,
+            "carbos": 12,
+            "grasas": 0.1,
+            "kcal": 47,
+            "peso_unidad": 130
+        },
+        "mandarina": {
+            "proteinas": 0.8,
+            "carbos": 13,
+            "grasas": 0.3,
+            "kcal": 53,
+            "peso_unidad": 100
+        },
+        "pera": {
+            "proteinas": 0.4,
+            "carbos": 15,
+            "grasas": 0.1,
+            "kcal": 57,
+            "peso_unidad": 150
+        },
+        "kiwi": {
+            "proteinas": 1,
+            "carbos": 15,
+            "grasas": 0.5,
+            "kcal": 61,
+            "peso_unidad": 75
+        },
+        "fresa": {
+            "proteinas": 0.7,
+            "carbos": 8,
+            "grasas": 0.3,
+            "kcal": 32,
+            "peso_unidad": 12
+        },
+        "uva": {
+            "proteinas": 0.7,
+            "carbos": 18,
+            "grasas": 0.2,
+            "kcal": 69
+        },
+        "sandia": {
+            "proteinas": 0.6,
+            "carbos": 8,
+            "grasas": 0.2,
+            "kcal": 30
+        },
+        "palta": {
+            "proteinas": 2,
+            "carbos": 9,
+            "grasas": 15,
+            "kcal": 160,
+            "peso_unidad": 150
+        },
+        "_sec_verduras": "🥦 --------------- VERDURAS --------------- 🥦",
+        "papa": {
+            "proteinas": 2,
+            "carbos": 17,
+            "grasas": 0.1,
+            "kcal": 77,
+            "peso_unidad": 200
+        },
+        "batata": {
+            "proteinas": 1.6,
+            "carbos": 20,
+            "grasas": 0.1,
+            "kcal": 86,
+            "peso_unidad": 200
+        },
+        "tomate": {
+            "proteinas": 0.9,
+            "carbos": 3.9,
+            "grasas": 0.2,
+            "kcal": 18,
+            "peso_unidad": 120
+        },
+        "cebolla": {
+            "proteinas": 1.1,
+            "carbos": 9,
+            "grasas": 0.1,
+            "kcal": 40,
+            "peso_unidad": 110
+        },
+        "zanahoria": {
+            "proteinas": 0.9,
+            "carbos": 10,
+            "grasas": 0.2,
+            "kcal": 41,
+            "peso_unidad": 80
+        },
+        "lechuga": {
+            "proteinas": 1.4,
+            "carbos": 2.9,
+            "grasas": 0.2,
+            "kcal": 15
+        },
+        "brocoli": {
+            "proteinas": 2.8,
+            "carbos": 7,
+            "grasas": 0.4,
+            "kcal": 34
+        },
+        "zapallo": {
+            "proteinas": 1,
+            "carbos": 6,
+            "grasas": 0.1,
+            "kcal": 26
+        },
+        "zucchini": {
+            "proteinas": 1.2,
+            "carbos": 3.1,
+            "grasas": 0.3,
+            "kcal": 17,
+            "peso_unidad": 150
+        },
+        "pure": {
+            "de papa": {
+                "proteinas": 2,
+                "carbos": 15,
+                "grasas": 4,
+                "kcal": 88
+            },
+            "de zapallo": {
+                "proteinas": 1,
+                "carbos": 9,
+                "grasas": 1,
+                "kcal": 40
+            },
+            "mixto": {
+                "proteinas": 1.5,
+                "carbos": 12,
+                "grasas": 2.5,
+                "kcal": 64
+            }
+        },
+        "_sec_legumbres": "🥜 --------------- LEGUMBRES Y FRUTOS SECOS --------------- 🥜",
+        "lentejas": {
+            "proteinas": 9,
+            "carbos": 20,
+            "grasas": 0.4,
+            "kcal": 116
+        },
+        "garbanzos": {
+            "proteinas": 19,
+            "carbos": 61,
+            "grasas": 6,
+            "kcal": 364
+        },
+        "frijol": {
+            "proteinas": 21,
+            "carbos": 63,
+            "grasas": 1.2,
+            "kcal": 347
+        },
+        "soja": {
+            "proteinas": 36,
+            "carbos": 30,
+            "grasas": 20,
+            "kcal": 446
+        },
+        "almendras": {
+            "proteinas": 21,
+            "carbos": 22,
+            "grasas": 49,
+            "kcal": 579
+        },
+        "nueces": {
+            "proteinas": 15,
+            "carbos": 14,
+            "grasas": 65,
+            "kcal": 654
+        },
+        "mani": {
+            "proteinas": 26,
+            "carbos": 16,
+            "grasas": 49,
+            "kcal": 567
+        },
+        "chia": {
+            "proteinas": 16,
+            "carbos": 42,
+            "grasas": 30,
+            "kcal": 486
+        },
+        "_sec_condimentos": "🧂 --------------- SALSAS Y CONDIMENTOS --------------- 🧂",
+        "aceite oliva": {
+            "proteinas": 0,
+            "carbos": 0,
+            "grasas": 100,
+            "kcal": 884
+        },
+        "aceite girasol": {
+            "proteinas": 0,
+            "carbos": 0,
+            "grasas": 100,
+            "kcal": 884
+        },
+        "mayonesa": {
+            "proteinas": 0.5,
+            "carbos": 0.5,
+            "grasas": 71,
+            "kcal": 683
+        },
+        "ketchup": {
+            "proteinas": 0.3,
+            "carbos": 25,
+            "grasas": 0.1,
+            "kcal": 100
+        },
+        "salsa de soja": {
+            "proteinas": 8,
+            "carbos": 5,
+            "grasas": 0.1,
+            "kcal": 53
+        },
+        "miel": {
+            "proteinas": 0.3,
+            "carbos": 82,
+            "grasas": 0,
+            "kcal": 304
+        },
+        "azucar": {
+            "proteinas": 0,
+            "carbos": 100,
+            "grasas": 0,
+            "kcal": 387
+        },
+        "jengibre": {
+            "proteinas": 1.8,
+            "carbos": 17,
+            "grasas": 0.7,
+            "kcal": 80
+        },
+        "_sec_bebidas": "🥤 --------------- BEBIDAS --------------- 🥤",
+        "agua": {
+            "proteinas": 0,
+            "carbos": 0,
+            "grasas": 0,
+            "kcal": 0
+        },
+        "mate": {
+            "proteinas": 0,
+            "carbos": 0,
+            "grasas": 0,
+            "kcal": 0
+        },
+        "cafe": {
+            "proteinas": 0.3,
+            "carbos": 0,
+            "grasas": 0,
+            "kcal": 2
+        },
+        "cerveza": {
+            "proteinas": 0.6,
+            "carbos": 3.5,
+            "grasas": 0,
+            "kcal": 42
+        },
+        "vino tinto": {
+            "proteinas": 0.1,
+            "carbos": 3.8,
+            "grasas": 0,
+            "kcal": 82
+        },
+        "whisky": {
+            "proteinas": 0,
+            "carbos": 0,
+            "grasas": 0,
+            "kcal": 239
+        },
+        "fernet": {
+            "proteinas": 0,
+            "carbos": 11,
+            "grasas": 0,
+            "kcal": 275
+        },
+        "gaseosa cola": {
+            "proteinas": 0,
+            "carbos": 10.6,
+            "grasas": 0,
+            "kcal": 42
+        },
+        "gaseosa lima limon": {
+            "proteinas": 0,
+            "carbos": 10,
+            "grasas": 0,
+            "kcal": 40
+        },
+        "jugo de naranja": {
+            "proteinas": 0.7,
+            "carbos": 10,
+            "grasas": 0.2,
+            "kcal": 45
+        }
+    }
+}

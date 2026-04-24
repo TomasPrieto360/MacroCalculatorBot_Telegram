@@ -1,0 +1,10 @@
+# Entorno de Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Base de datos de usuarios (NO SUBIR DATOS PRIVADOS AL REPO PUBLICO)
+usuarios.json
