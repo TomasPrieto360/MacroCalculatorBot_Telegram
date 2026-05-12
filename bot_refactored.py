@@ -694,14 +694,25 @@ Reglas obligatorias:
             return
             
         bot.send_chat_action(message.chat.id, 'typing')
+        
+        # Usar gemini-1.5-flash que es más estable y disponible
         response = gemini_client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-1.5-flash',
             contents=prompt
         )
-        bot.reply_to(message, response.text, reply_markup=menu_principal())
+        
+        if response.text:
+            bot.reply_to(message, response.text, reply_markup=menu_principal())
+        else:
+            bot.reply_to(message, "La IA no generó respuesta. Probá de nuevo.", reply_markup=menu_principal())
+            
     except Exception as e:
         print(f"Error IA: {e}")
-        bot.reply_to(message, f"Uy, la IA no respondió. Error: {str(e)[:50]}", reply_markup=menu_principal())
+        error_msg = str(e)
+        if "API_KEY" in error_msg or "invalid" in error_msg.lower():
+            bot.reply_to(message, "⚠️ Error de API Key. Verificá que la GEMINI_API_KEY sea válida.", reply_markup=menu_principal())
+        else:
+            bot.reply_to(message, f"Uy, la IA no respondió. Error: {error_msg[:80]}", reply_markup=menu_principal())
 
 
 # ----------------- SCANNER VISUAL (ETIQUETAS) -----------------
@@ -730,7 +741,7 @@ Si la imagen no parece ser una etiqueta nutricional, poné "es_etiqueta": false 
 
         # 3. Llamar a Gemini (SDK v2)
         response = gemini_client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-1.5-flash',
             contents=[prompt, {"mime_type": "image/jpeg", "data": downloaded_file}],
             config={'response_mime_type': 'application/json'}
         )
