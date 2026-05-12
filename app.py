@@ -21,8 +21,15 @@ gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
 MONGO_URI = os.getenv("MONGO_URI")
 if MONGO_URI:
     try:
-        # Usar la URI directamente - PyMongo maneja los caracteres especiales automáticamente
-        mongo_client = MongoClient(MONGO_URI)
+        # Conexión optimizada con pool de conexiones y retry
+        mongo_client = MongoClient(
+            MONGO_URI,
+            maxPoolSize=10,
+            minPoolSize=1,
+            serverSelectionTimeoutMS=5000,
+            retryWrites=True,
+            retryReads=True
+        )
         db = mongo_client.get_database("macrobot_db")
         col_usuarios = db.usuarios
         col_alimentos = db.alimentos
@@ -75,7 +82,7 @@ datos_usuarios = MongoDict()
 def guardar_datos():
     for user_id, data in datos_usuarios.items():
         save_user(user_id, data)
-    datos_usuarios.clear() # Clear cache so next request fetches fresh data
+    # NO limpiamos el cache - mantenemos datos en memoria entre requests
 
 
 TOKEN = os.getenv('TELEGRAM_TOKEN', 'TU_TOKEN_ACA')
