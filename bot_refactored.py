@@ -687,14 +687,21 @@ Reglas obligatorias:
 """
     
     try:
+        # Verificar que tenga API Key configurada
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key or api_key == "tu_api_key_de_gemini_aqui":
+            bot.reply_to(message, "⚠️ La API Key de Gemini no está configurada. Agregá GEMINI_API_KEY en las variables de entorno.", reply_markup=menu_principal())
+            return
+            
         bot.send_chat_action(message.chat.id, 'typing')
         response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt
         )
         bot.reply_to(message, response.text, reply_markup=menu_principal())
     except Exception as e:
-        bot.reply_to(message, "Uy, parece que la IA está durmiendo (¿Pusiste la API Key en el .env?).", reply_markup=menu_principal())
+        print(f"Error IA: {e}")
+        bot.reply_to(message, f"Uy, la IA no respondió. Error: {str(e)[:50]}", reply_markup=menu_principal())
 
 
 # ----------------- SCANNER VISUAL (ETIQUETAS) -----------------
@@ -723,7 +730,7 @@ Si la imagen no parece ser una etiqueta nutricional, poné "es_etiqueta": false 
 
         # 3. Llamar a Gemini (SDK v2)
         response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=[prompt, {"mime_type": "image/jpeg", "data": downloaded_file}],
             config={'response_mime_type': 'application/json'}
         )
