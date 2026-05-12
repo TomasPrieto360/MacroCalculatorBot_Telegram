@@ -21,16 +21,39 @@ gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 MONGO_URI = os.getenv("MONGO_URI")
 if MONGO_URI:
-    mongo_client = MongoClient(MONGO_URI)
-    db = mongo_client.get_database("macrobot_db")
-    col_usuarios = db.usuarios
-    col_alimentos = db.alimentos
+    try:
+        # Parsear y escapar el password si tiene caracteres especiales
+        if "://" in MONGO_URI:
+            # Extraer usuario:password@host
+            from urllib.parse import urlparse
+            parsed = urlparse(MONGO_URI)
+            if parsed.password:
+                # Reconstruir con password escapado
+                user = parsed.username
+                password = quote_plus(parsed.password)
+                host = parsed.netloc.split('@')[1] if '@' in parsed.netloc else parsed.netloc
+                db_name = parsed.path.replace('/', '') if parsed.path else 'macrobot_db'
+                
+                new_uri = f"{parsed.scheme}://{user}:{password}@{host}/{db_name}{'?' + parsed.query if parsed.query else ''}"
+                MONGO_URI = new_uri
+                print(f"🔧 URI de MongoDB re-construida con password escapado")
+        
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client.get_database("macrobot_db")
+        col_usuarios = db.usuarios
+        col_alimentos = db.alimentos
+        print("✅ MongoDB conectado exitosamente")
+    except Exception as e:
+        print(f"❌ Error conectando a MongoDB: {e}")
+        col_usuarios = None
+        col_alimentos = None
 else:
     print("ADVERTENCIA: MONGO_URI no encontrado.")
     col_usuarios = None
