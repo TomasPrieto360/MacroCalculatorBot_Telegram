@@ -15,4 +15,4 @@ COPY . .
 # Exponer el puerto para Gunicorn
 EXPOSE 10000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "bot_refactored:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
