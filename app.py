@@ -57,16 +57,22 @@ else:
 def get_user(user_id):
     user_id = str(user_id)
     if col_usuarios is not None:
-        user = col_usuarios.find_one({"_id": user_id})
-        if user:
-            return user
+        try:
+            user = col_usuarios.find_one({"_id": user_id})
+            if user:
+                return user
+        except Exception as e:
+            print(f"[WARN] Error leyendo usuario: {e}")
     return {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": [], "mis_alimentos": {}}
 
 def save_user(user_id, data):
     user_id = str(user_id)
     if col_usuarios is not None:
-        data["_id"] = user_id
-        col_usuarios.update_one({"_id": user_id}, {"$set": data}, upsert=True)
+        try:
+            data["_id"] = user_id
+            col_usuarios.update_one({"_id": user_id}, {"$set": data}, upsert=True)
+        except Exception as e:
+            print(f"[WARN] Error guardando usuario: {e}")
 
 # Cache en memoria por peticion para evitar múltiples llamadas a DB en un solo comando
 user_cache = {}
