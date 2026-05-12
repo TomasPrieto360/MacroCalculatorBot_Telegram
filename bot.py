@@ -4,10 +4,10 @@ import json
 import os
 import sys
 from dotenv import load_dotenv
-
 import difflib
 from google import genai
-import uuid # Para generar IDs unicos para historial
+import uuid
+from pymongo import MongoClient
 
 # Obtener la ruta absoluta donde está bot.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,16 +18,65 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # Configurar Gemini (nuevo SDK)
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
 
-archivo_datos = os.path.join(BASE_DIR, "usuarios.json")
-if os.path.exists(archivo_datos):
-    with open(archivo_datos, 'r') as f:
-        datos_usuarios = json.load(f)
+MONGO_URI = os.getenv("MONGO_URI")
+if MONGO_URI:
+    try:
+        # Usar la URI directamente - PyMongo maneja los caracteres especiales automáticamente
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client.get_database("macrobot_db")
+        col_usuarios = db.usuarios
+        col_alimentos = db.alimentos
+        print("[OK] MongoDB conectado exitosamente")
+    except Exception as e:
+        print(f"[ERROR] Error conectando a MongoDB: {e}")
+        col_usuarios = None
+        col_alimentos = None
 else:
-    datos_usuarios = {}
+    print("ADVERTENCIA: MONGO_URI no encontrado.")
+    col_usuarios = None
+    col_alimentos = None
+
+def get_user(user_id):
+    user_id = str(user_id)
+    if col_usuarios is not None:
+        user = col_usuarios.find_one({"_id": user_id})
+        if user:
+            return user
+    return {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": [], "mis_alimentos": {}}
+
+def save_user(user_id, data):
+    user_id = str(user_id)
+    if col_usuarios is not None:
+        data["_id"] = user_id
+        col_usuarios.update_one({"_id": user_id}, {"$set": data}, upsert=True)
+
+# Cache en memoria por peticion para evitar múltiples llamadas a DB en un solo comando
+user_cache = {}
+
+class MongoDict(dict):
+    def __getitem__(self, key):
+        key = str(key)
+        if not super().__contains__(key):
+            user = get_user(key)
+            super().__setitem__(key, user)
+        return super().__getitem__(key)
+        
+    def __contains__(self, key):
+        key = str(key)
+        if super().__contains__(key):
+            return True
+        # Si no está en memoria, probamos cargarlo. get_user siempre devuelve un dict (existente o default)
+        user = get_user(key)
+        super().__setitem__(key, user)
+        return True
+
+datos_usuarios = MongoDict()
 
 def guardar_datos():
-    with open(archivo_datos, 'w') as f:
-        json.dump(datos_usuarios, f, indent=4)
+    for user_id, data in datos_usuarios.items():
+        save_user(user_id, data)
+    datos_usuarios.clear() # Clear cache so next request fetches fresh data
+
 
 TOKEN = os.getenv('TELEGRAM_TOKEN', 'TU_TOKEN_ACA')
 bot = telebot.TeleBot(TOKEN, threaded=False)
@@ -615,14 +664,32 @@ Reglas obligatorias:
 """
     
     try:
+        # Verificar que tenga API Key configurada
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key or api_key == "tu_api_key_de_gemini_aqui":
+            bot.reply_to(message, "⚠️ La API Key de Gemini no está configurada. Agregá GEMINI_API_KEY en las variables de entorno.", reply_markup=menu_principal())
+            return
+            
         bot.send_chat_action(message.chat.id, 'typing')
+        
+        # Usar gemini-2.5-flash que es el modelo estable actual
         response = gemini_client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt
         )
-        bot.reply_to(message, response.text, reply_markup=menu_principal())
+        
+        if response.text:
+            bot.reply_to(message, response.text, reply_markup=menu_principal())
+        else:
+            bot.reply_to(message, "La IA no generó respuesta. Probá de nuevo.", reply_markup=menu_principal())
+            
     except Exception as e:
-        bot.reply_to(message, "Uy, parece que la IA está durmiendo (¿Pusiste la API Key en el .env?).", reply_markup=menu_principal())
+        print(f"Error IA: {e}")
+        error_msg = str(e)
+        if "API_KEY" in error_msg or "invalid" in error_msg.lower():
+            bot.reply_to(message, "⚠️ Error de API Key. Verificá que la GEMINI_API_KEY sea válida.", reply_markup=menu_principal())
+        else:
+            bot.reply_to(message, f"Uy, la IA no respondió. Error: {error_msg[:80]}", reply_markup=menu_principal())
 
 
 # ----------------- SCANNER VISUAL (ETIQUETAS) -----------------
@@ -1059,13 +1126,18 @@ def manejar_fuzzy(call):
 import time
 from flask import Flask, request
 
-# Configuración del servidor Web (Flask) para PythonAnywhere
+# Configuración del servidor Web para Render/Production
 app = Flask(__name__)
 
 # Ruta base para chequear que la app está viva
 @app.route('/')
 def index():
-    return "Bot de Telegram funcionando 24/7 con Webhooks", 200
+    return "MacroBot funcionando 24/7 con MongoDB", 200
+
+# Ruta de health check para Render
+@app.route('/health')
+def health():
+    return {"status": "ok"}, 200
 
 # Ruta oculta donde Telegram manda los mensajes
 @app.route('/' + TOKEN, methods=['POST'])
@@ -1075,7 +1147,19 @@ def webhook():
     bot.process_new_updates([update])
     return 'OK', 200
 
-# IMPORTANTE: Ya NO usamos bot.polling() porque PythonAnywhere lo mata.
-# bot.remove_webhook()
-# time.sleep(1)
-# bot.set_webhook(url="https://<TU_USUARIO>.pythonanywhere.com/" + os.getenv("TELEGRAM_TOKEN"))
+# ----------------- INICIO EN PRODUCCIÓN -----------------
+if __name__ == "__main__":
+    # Configurar webhook automáticamente en producción (Render)
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    if render_url:
+        print(f"[WEBHOOK] Configurando hacia: {render_url}")
+        bot.remove_webhook()
+        time.sleep(1)
+        bot.set_webhook(url=f"{render_url}/{TOKEN}")
+        print(f"[OK] Webhook configurado correctamente")
+    else:
+        print("[INFO] Entorno de desarrollo local - webhook no configurado")
+    
+    # Arrancar Flask
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
