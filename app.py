@@ -19,27 +19,38 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 MONGO_URI = os.getenv("MONGO_URI")
+mongo_available = False
+
 if MONGO_URI:
     try:
-        # Conexión optimizada con pool de conexiones y retry
+        # Conexión optimizada - timeout reducido para detectar errores rápido
         mongo_client = MongoClient(
             MONGO_URI,
             maxPoolSize=10,
             minPoolSize=1,
-            serverSelectionTimeoutMS=5000,
+            serverSelectionTimeoutMS=3000,
+            connectTimeoutMS=5000,
             retryWrites=True,
-            retryReads=True
+            retryReads=True,
+            tls=True,
+            tlsAllowInvalidCertificates=False
         )
+        # Test de conexión
+        mongo_client.admin.command('ping')
         db = mongo_client.get_database("macrobot_db")
         col_usuarios = db.usuarios
         col_alimentos = db.alimentos
+        mongo_available = True
         print("[OK] MongoDB conectado exitosamente")
     except Exception as e:
-        print(f"[ERROR] Error conectando a MongoDB: {e}")
+        print(f"[ERROR] MongoDB no disponible: {e}")
+        print("[INFO] Usando modo en memoria (sin persistencia)")
+        mongo_client = None
         col_usuarios = None
         col_alimentos = None
 else:
-    print("ADVERTENCIA: MONGO_URI no encontrado.")
+    print("ADVERTENCIA: MONGO_URI no encontrado - modo memoria")
+    mongo_client = None
     col_usuarios = None
     col_alimentos = None
 
