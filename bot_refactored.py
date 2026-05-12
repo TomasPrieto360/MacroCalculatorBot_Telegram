@@ -695,9 +695,9 @@ Reglas obligatorias:
             
         bot.send_chat_action(message.chat.id, 'typing')
         
-        # Usar gemini-1.5-flash que es más estable y disponible
+        # Usar gemini-2.5-flash que es el modelo estable actual
         response = gemini_client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt
         )
         
@@ -741,7 +741,7 @@ Si la imagen no parece ser una etiqueta nutricional, poné "es_etiqueta": false 
 
         # 3. Llamar a Gemini (SDK v2)
         response = gemini_client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=[prompt, {"mime_type": "image/jpeg", "data": downloaded_file}],
             config={'response_mime_type': 'application/json'}
         )
