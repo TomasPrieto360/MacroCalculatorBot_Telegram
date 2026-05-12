@@ -153,11 +153,27 @@
         },
         "_sec_lacteos": "🧀 --------------- LÁCTEOS Y HUEVOS --------------- 🧀",
         "huevo": {
-            "proteinas": 13,
-            "carbos": 1.1,
-            "grasas": 11,
-            "kcal": 155,
-            "peso_unidad": 50
+            "entero": {
+                "proteinas": 13,
+                "carbos": 1.1,
+                "grasas": 11,
+                "kcal": 155,
+                "peso_unidad": 50
+            },
+            "clara": {
+                "proteinas": 11,
+                "carbos": 0.7,
+                "grasas": 0.2,
+                "kcal": 52,
+                "peso_unidad": 35
+            },
+            "yema": {
+                "proteinas": 16,
+                "carbos": 3.6,
+                "grasas": 27,
+                "kcal": 322,
+                "peso_unidad": 15
+            }
         },
         "leche": {
             "entera": {
@@ -171,6 +187,12 @@
                 "carbos": 5.0,
                 "grasas": 0.1,
                 "kcal": 35
+            },
+            "semidescremada": {
+                "proteinas": 3.3,
+                "carbos": 4.8,
+                "grasas": 1.5,
+                "kcal": 46
             },
             "de almendras": {
                 "proteinas": 0.5,
@@ -191,6 +213,12 @@
                 "carbos": 1,
                 "grasas": 24,
                 "kcal": 300
+            },
+            "por salut": {
+                "proteinas": 25,
+                "carbos": 1,
+                "grasas": 15,
+                "kcal": 240
             },
             "rallado": {
                 "proteinas": 33,
@@ -273,6 +301,28 @@
                 "grasas": 1.1,
                 "kcal": 115
             }
+        },
+        "avena": {
+            "en copos": {
+                "proteinas": 13,
+                "carbos": 60,
+                "grasas": 7,
+                "kcal": 370
+            }
+        },
+        "galleta de arroz": {
+            "proteinas": 8,
+            "carbos": 80,
+            "grasas": 2,
+            "kcal": 380,
+            "peso_unidad": 7
+        },
+        "tortilla de trigo": {
+            "proteinas": 8,
+            "carbos": 50,
+            "grasas": 7,
+            "kcal": 300,
+            "peso_unidad": 35
         },
         "pasta": {
             "seca": {
@@ -663,6 +713,35 @@
             "carbos": 10,
             "grasas": 0.2,
             "kcal": 45
+        },
+        "_sec_suplementos": "💊 --------------- SUPLEMENTOS Y SNACKS --------------- 💊",
+        "whey protein": {
+            "proteinas": 75,
+            "carbos": 8,
+            "grasas": 5,
+            "kcal": 380,
+            "peso_unidad": 30
+        },
+        "mantequilla de mani": {
+            "proteinas": 25,
+            "carbos": 20,
+            "grasas": 50,
+            "kcal": 588,
+            "peso_unidad": 15
+        },
+        "turron": {
+            "proteinas": 5,
+            "carbos": 70,
+            "grasas": 15,
+            "kcal": 415,
+            "peso_unidad": 25
+        },
+        "barrita de cereal": {
+            "proteinas": 6,
+            "carbos": 65,
+            "grasas": 12,
+            "kcal": 380,
+            "peso_unidad": 23
         }
     }
 }
