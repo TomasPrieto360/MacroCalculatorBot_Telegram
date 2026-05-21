@@ -109,7 +109,7 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 def menu_principal():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("🍎 Registrar Comida", "📊 Mi Día")
-    markup.add("⚙️ Herramientas")
+    markup.add("⚙️ Herramientas", "📝 Agregar Macros (IA)")
     return markup
 
 def menu_mi_dia():
@@ -716,6 +716,90 @@ Reglas obligatorias:
             bot.reply_to(message, f"Uy, la IA no respondió. Error: {error_msg[:80]}", reply_markup=menu_principal())
 
 
+@bot.message_handler(func=lambda message: message.text == "📝 Agregar Macros (IA)")
+def iniciar_estimacion_ia(message):
+    msg = bot.reply_to(message, "¡Contame qué comiste! Describilo con todos los detalles posibles (ej: '300g de fideos con pesto y crema'). Yo estimo los macros y los cargo.", reply_markup=boton_volver())
+    bot.register_next_step_handler(msg, procesar_estimacion_ia)
+
+def procesar_estimacion_ia(message):
+    if message.text == "🔙 Volver":
+        bot.reply_to(message, "Cancelado.", reply_markup=menu_principal())
+        return
+        
+    user_id = str(message.from_user.id)
+    
+    prompt = f"""El usuario comió: '{message.text}'.
+Sos un nutricionista y extractor de información. Estima los macros (Kcal, proteínas, carbohidratos, grasas) para este plato/comida.
+Considerá porciones lógicas estándar si el usuario no especifica cantidades.
+
+Devolvé EXCLUSIVAMENTE un objeto JSON válido, sin markdown, sin texto adicional, con la siguiente estructura:
+{{
+  "alimento": "Nombre corto del plato (ej: Fideos al pesto con crema)",
+  "kcal": 0.0,
+  "proteinas": 0.0,
+  "carbos": 0.0,
+  "grasas": 0.0,
+  "explicacion": "Breve explicación de la porción estimada en 1 o 2 frases."
+}}
+"""
+    
+    try:
+        # Verificar que tenga API Key configurada
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key or api_key == "tu_api_key_de_gemini_aqui":
+            bot.reply_to(message, "⚠️ La API Key de Gemini no está configurada. Agregá GEMINI_API_KEY en las variables de entorno.", reply_markup=menu_principal())
+            return
+            
+        bot.send_chat_action(message.chat.id, 'typing')
+        
+        # Usar gemini-2.5-flash
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config={'response_mime_type': 'application/json'}
+        )
+        
+        texto_limpio = response.text.strip()
+        if texto_limpio.startswith("```json"):
+            texto_limpio = texto_limpio.replace("```json", "").replace("```", "").strip()
+            
+        datos = json.loads(texto_limpio)
+        
+        if user_id not in datos_usuarios:
+            datos_usuarios[user_id] = {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": []}
+            
+        # Guardar en MongoDB para evitar desincronización entre workers
+        datos_usuarios[user_id]["estimacion_pendiente"] = {
+            "alimento": datos.get("alimento", "Estimación IA"),
+            "kcal": float(datos.get("kcal", 0)),
+            "proteinas": float(datos.get("proteinas", 0)),
+            "carbos": float(datos.get("carbos", 0)),
+            "grasas": float(datos.get("grasas", 0))
+        }
+        guardar_datos()
+        
+        respuesta = (f"🔍 **Estimación de la IA:**\n"
+                     f"🍽️ **Plato:** {datos.get('alimento')}\n\n"
+                     f"🔥 **Kcal:** {datos.get('kcal'):.0f}\n"
+                     f"🥩 **Proteínas:** {datos.get('proteinas'):.1f}g\n"
+                     f"🍞 **Carbos:** {datos.get('carbos'):.1f}g\n"
+                     f"🥑 **Grasas:** {datos.get('grasas'):.1f}g\n\n"
+                     f"💡 *{datos.get('explicacion')}*\n\n"
+                     f"¿Querés registrar esta comida en tu día?")
+                     
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("✅ Registrar", callback_data="confirmar_ia"),
+            InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_ia")
+        )
+        
+        bot.reply_to(message, respuesta, reply_markup=markup, parse_mode="Markdown")
+        
+    except Exception as e:
+        print(f"Error Estimación IA: {e}")
+        bot.reply_to(message, "Uy, no pude estimar la comida. Asegurate de escribir una comida válida y de que la API key funcione.", reply_markup=menu_principal())
+
+
 # ----------------- SCANNER VISUAL (ETIQUETAS) -----------------
 @bot.message_handler(content_types=['photo'])
 def leer_etiqueta(message):
@@ -1036,6 +1120,55 @@ def manejar_variante(call):
     del registro_temporal[user_id]['cantidad_pendiente_unidad']
 
 # ----------------- DESHACER Y BORRAR HISTORIAL -----------------
+@bot.callback_query_handler(func=lambda call: call.data in ["confirmar_ia", "cancelar_ia"])
+def manejar_confirmacion_ia(call):
+    user_id = str(call.from_user.id)
+    if call.data == "cancelar_ia":
+        if user_id in datos_usuarios and "estimacion_pendiente" in datos_usuarios[user_id]:
+            del datos_usuarios[user_id]["estimacion_pendiente"]
+            guardar_datos()
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="❌ Carga cancelada.")
+        return
+        
+    if user_id not in datos_usuarios or "estimacion_pendiente" not in datos_usuarios[user_id]:
+        bot.answer_callback_query(call.id, "No hay ninguna estimación pendiente o la sesión expiró.")
+        return
+        
+    est = datos_usuarios[user_id]["estimacion_pendiente"]
+    kcal = est.get("kcal", 0)
+    prot = est.get("proteinas", 0)
+    carb = est.get("carbos", 0)
+    gras = est.get("grasas", 0)
+    alimento = est.get("alimento", "Estimación IA")
+    
+    if "historial_hoy" not in datos_usuarios[user_id]:
+        datos_usuarios[user_id]["historial_hoy"] = []
+        
+    datos_usuarios[user_id]["kcal"] += kcal
+    datos_usuarios[user_id]["proteinas"] += prot
+    datos_usuarios[user_id]["carbos"] += carb
+    datos_usuarios[user_id]["grasas"] += gras
+    
+    nuevo_id = str(uuid.uuid4())[:8]
+    datos_usuarios[user_id]["historial_hoy"].append({
+        "id": nuevo_id,
+        "alimento": alimento,
+        "cantidad_str": "1 porción",
+        "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras
+    })
+    
+    del datos_usuarios[user_id]["estimacion_pendiente"]
+    guardar_datos()
+    
+    markup_undo = InlineKeyboardMarkup()
+    markup_undo.add(InlineKeyboardButton("↩️ Deshacer esto", callback_data=f"undo_{nuevo_id}"))
+    
+    respuesta = (f"🍗 Agregaste {alimento} (Estimado por IA):\n"
+                 f"🔥 Kcal: {kcal:.0f}\n🥩 Proteínas: {prot:.1f}g\n"
+                 f"🍞 Carbos: {carb:.1f}g\n🥑 Grasas: {gras:.1f}g")
+                 
+    bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=respuesta, reply_markup=markup_undo)
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("undo_") or call.data.startswith("delhist_"))
 def manejar_borrado_historial(call):
     user_id = str(call.from_user.id)

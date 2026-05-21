@@ -9,6 +9,7 @@ MacroBot es un bot de Telegram para seguimiento nutricional. Permite registrar c
 - 📦 **Paquetes Personalizados** - Cargá productos del supermercado escaneando sus etiquetas
 - 🍳 **Sistema de Recetas** - Armá recetas y el bot recalcula valores a 100g
 - 🧠 **IA Nutricional** - Consultale a Gemini qué podés preparar con lo que tengas
+- 📝 **Agregar Macros (IA)** - Registrá comidas rápidas o complejas describiéndoselas a la IA (ej: "fideos con pesto y crema")
 - 📷 **Scanner de Etiquetas** - Enviá foto de una etiqueta y el bot la lee automáticamente
 - ☁️ **MongoDB** - Base de datos en la nube (no más JSONs locales)
 
@@ -52,7 +53,7 @@ git push origin main
    - **Name**: macrobot
    - **Environment**: Python
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT bot_refactored:app`
+   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT app:app`
 
 #### 4. Configurá las Variables de Entorno
 
@@ -72,7 +73,7 @@ Click en **"Create Web Service"** y esperá a que termine el build.
 
 Una vez deployado, vas a ver la URL de tu servicio (ej: `https://macrobot.onrender.com`).
 
-**Opción A - Automático**: El bot ya se configura solo al iniciar (líneas finales de `bot_refactored.py`)
+**Opción A - Automático**: El bot ya se configura solo al iniciar (líneas finales de `app.py`)
 
 **Opción B - Manual** (si no funcionó):
 ```bash
@@ -106,15 +107,15 @@ Cuando tu bot esté funcionando en Render:
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Ejecutar (usa polling, no webhooks)
-python bot_refactored.py
+# Ejecutar (usa webhook en prod, local flask server)
+python app.py
 ```
 
 ## 📁 Estructura
 
 ```
 MacroBot/
-├── bot_refactored.py   # Bot principal con MongoDB
+├── app.py              # Bot principal con MongoDB
 ├── migrate_db.py       # Script de migración JSON → MongoDB
 ├── alimentos.json      # Base de datos de alimentos
 ├── requirements.txt   # Dependencias Python
