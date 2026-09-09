@@ -8,6 +8,8 @@ import difflib
 from google import genai
 import uuid
 from pymongo import MongoClient
+import urllib.request
+import urllib.parse
 
 # Obtener la ruta absoluta donde está bot.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +56,119 @@ else:
     col_usuarios = None
     col_alimentos = None
 
+def guardar_alimento_global(nombre_key, stats):
+    """Guarda un alimento en la colección db.alimentos de MongoDB para enriquecer la base global del bot."""
+    if col_alimentos is not None and nombre_key:
+        try:
+            nombre_clean = str(nombre_key).lower().strip()
+            doc = {
+                "_id": nombre_clean,
+                "kcal": float(stats.get("kcal", 0)),
+                "proteinas": float(stats.get("proteinas", 0)),
+                "carbos": float(stats.get("carbos", 0)),
+                "grasas": float(stats.get("grasas", 0)),
+                "fibra": float(stats.get("fibra", 0)),
+                "sodio": float(stats.get("sodio", 0))
+            }
+            if "peso_unidad" in stats:
+                doc["peso_unidad"] = float(stats["peso_unidad"])
+            col_alimentos.update_one({"_id": nombre_clean}, {"$set": doc}, upsert=True)
+        except Exception as e:
+            print(f"[WARN] Error guardando alimento global en MongoDB: {e}")
+
+def buscar_alimento_mongo_global(nombre_key):
+    """Busca un alimento en la base de datos global db.alimentos de MongoDB."""
+    if col_alimentos is not None and nombre_key:
+        try:
+            nombre_clean = str(nombre_key).lower().strip()
+            doc = col_alimentos.find_one({"_id": nombre_clean})
+            if doc:
+                return doc
+        except Exception as e:
+            print(f"[WARN] Error consultando alimento global en MongoDB: {e}")
+    return None
+
+def buscar_open_food_facts(query):
+    """Busca alimentos en la API pública de Open Food Facts por nombre o código de barras."""
+    if not query:
+        return None
+    query_clean = str(query).strip().lower()
+    headers = {'User-Agent': 'MacroBotTelegram/2.0 (https://github.com/TomasPrieto360/MacroCalculatorBot_Telegram)'}
+    
+    try:
+        # 1. Si son solo dígitos (8 a 14 números), es un Código de Barras EAN
+        if query_clean.isdigit() and len(query_clean) in [8, 12, 13, 14]:
+            url = f"https://world.openfoodfacts.org/api/v2/product/{query_clean}.json"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data.get("status") == 1 and "product" in data:
+                    p = data["product"]
+                    nutriments = p.get("nutriments", {})
+                    nombre = p.get("product_name") or p.get("product_name_es") or query_clean
+                    sodio_val = nutriments.get("sodium_100g")
+                    sodio_mg = float(sodio_val) * 1000 if sodio_val is not None else (float(nutriments.get("salt_100g") or 0) / 2.5 * 1000)
+                    return {
+                        "alimento": nombre.lower(),
+                        "kcal": float(nutriments.get("energy-kcal_100g") or nutriments.get("energy-kcal_value") or 0),
+                        "proteinas": float(nutriments.get("proteins_100g") or 0),
+                        "carbos": float(nutriments.get("carbohydrates_100g") or 0),
+                        "grasas": float(nutriments.get("fat_100g") or 0),
+                        "fibra": float(nutriments.get("fiber_100g") or 0),
+                        "sodio": float(sodio_mg),
+                        "fuente": "openfoodfacts"
+                    }
+        
+        # 2. Búsqueda por texto
+        encoded_query = urllib.parse.quote(query_clean)
+        url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={encoded_query}&search_simple=1&action=process&json=1&page_size=5"
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            products = data.get("products", [])
+            for p in products:
+                nutriments = p.get("nutriments", {})
+                kcal = nutriments.get("energy-kcal_100g") or nutriments.get("energy-kcal_value")
+                if kcal is not None and float(kcal) > 0:
+                    nombre = p.get("product_name") or p.get("product_name_es") or query_clean
+                    sodio_val = nutriments.get("sodium_100g")
+                    sodio_mg = float(sodio_val) * 1000 if sodio_val is not None else (float(nutriments.get("salt_100g") or 0) / 2.5 * 1000)
+                    return {
+                        "alimento": nombre.lower(),
+                        "kcal": float(kcal),
+                        "proteinas": float(nutriments.get("proteins_100g") or 0),
+                        "carbos": float(nutriments.get("carbohydrates_100g") or 0),
+                        "grasas": float(nutriments.get("fat_100g") or 0),
+                        "fibra": float(nutriments.get("fiber_100g") or 0),
+                        "sodio": float(sodio_mg),
+                        "fuente": "openfoodfacts"
+                    }
+    except Exception as e:
+        print(f"[WARN] Open Food Facts Error: {e}")
+        
+    return None
+
+def calcular_indice_saciedad(prot, fibra, kcal, grasas):
+    """Calcula un índice de saciedad del 1.0 al 10.0 basado en proteínas, fibra, calorías y grasas."""
+    if kcal <= 0:
+        return 5.0, "🍐 Moderado"
+        
+    proteina_score = (prot / max(1, kcal / 100)) * 2.5
+    fibra_score = (fibra / max(1, kcal / 100)) * 3.0
+    grasa_deduction = (grasas / max(1, kcal / 100)) * 0.5
+    
+    score_raw = 4.0 + proteina_score + fibra_score - grasa_deduction
+    score = min(max(round(score_raw, 1), 1.0), 10.0)
+    
+    if score >= 7.5:
+        etiqueta = "🍏 ¡Muy Saciante!"
+    elif score >= 5.0:
+        etiqueta = "🍐 Saciante Moderado"
+    else:
+        etiqueta = "🍕 Poco Saciante"
+        
+    return score, etiqueta
+
 def get_user(user_id):
     user_id = str(user_id)
     if col_usuarios is not None:
@@ -63,7 +178,10 @@ def get_user(user_id):
                 return user
         except Exception as e:
             print(f"[WARN] Error leyendo usuario: {e}")
-    return {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": [], "mis_alimentos": {}}
+    return {
+        "kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "fibra": 0, "sodio": 0,
+        "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": [], "mis_alimentos": {}
+    }
 
 def save_user(user_id, data):
     user_id = str(user_id)
@@ -203,6 +321,8 @@ def terminar_dia(message):
         datos_usuarios[user_id]["proteinas"] = 0
         datos_usuarios[user_id]["carbos"] = 0
         datos_usuarios[user_id]["grasas"] = 0
+        datos_usuarios[user_id]["fibra"] = 0
+        datos_usuarios[user_id]["sodio"] = 0
         datos_usuarios[user_id]["historial_hoy"] = []
         guardar_datos()
         bot.reply_to(message, "🧹 ¡Día reiniciado! Todos tus macros volvieron a cero. ¡Mañana será otro día!", reply_markup=menu_principal())
@@ -232,6 +352,11 @@ def mostrar_resumen(message):
         prot_actual = datos.get("proteinas", 0)
         carb_actual = datos.get("carbos", 0)
         gras_actual = datos.get("grasas", 0)
+        fibra_actual = datos.get("fibra", 0)
+        sodio_actual = datos.get("sodio", 0)
+        
+        carbos_netos = max(0.0, carb_actual - fibra_actual)
+        score_saciedad, etiqueta_saciedad = calcular_indice_saciedad(prot_actual, fibra_actual, kcal_actual, gras_actual)
         
         faltan_protes = meta_protes - prot_actual
         faltan_kcal = meta_kcal - kcal_actual
@@ -245,14 +370,18 @@ def mostrar_resumen(message):
         texto_protes = f"¡Pasaste la meta por {abs(faltan_protes):.1f}g!" if faltan_protes < 0 else f"Faltan {faltan_protes:.1f}g"
         texto_kcal = f"¡Te pasaste por {abs(faltan_kcal):.0f} kcal!" if faltan_kcal < 0 else f"Faltan {faltan_kcal:.0f} kcal"
         
+        alerta_sodio = " ⚠️ (Elevado)" if sodio_actual > 2300 else ""
+        
         respuesta = (
             f"📊 **Resumen del Día:**\n\n"
             f"🔥 **Kcal:** [{barra_kcal}] {kcal_actual:.0f} / {meta_kcal:.0f} ({pct_kcal:.0f}%)\n"
             f"👉 _{texto_kcal}_\n\n"
             f"🥩 **Proteínas:** [{barra_prot}] {prot_actual:.1f} / {meta_protes:.1f}g ({pct_prot:.0f}%)\n"
             f"👉 _{texto_protes}_\n\n"
-            f"🍞 **Carbos:** {carb_actual:.1f}g\n"
-            f"🥑 **Grasas:** {gras_actual:.1f}g"
+            f"🍞 **Carbos Netos:** {carbos_netos:.1f}g _(Total: {carb_actual:.1f}g \| Fibra: {fibra_actual:.1f}g 🌾)_\n"
+            f"🥑 **Grasas:** {gras_actual:.1f}g\n"
+            f"🧂 **Sodio:** {sodio_actual:.0f} mg / 2300 mg{alerta_sodio}\n\n"
+            f"🍏 **Índice de Saciedad:** {score_saciedad}/10 ({etiqueta_saciedad})"
         )
         bot.reply_to(message, respuesta, reply_markup=menu_mi_dia(), parse_mode="Markdown")
     else:
@@ -1270,17 +1399,19 @@ def calcular_macros(message):
             if alimento in datos_usuarios[user_id]["mis_alimentos"]:
                 stats = datos_usuarios[user_id]["mis_alimentos"][alimento]
                 
-        # 2. Si no lo encuentra, buscar en la global (json)
+        # 2. Buscar en MongoDB Global (db.alimentos)
+        if stats is None:
+            doc_mongo = buscar_alimento_mongo_global(alimento)
+            if doc_mongo:
+                stats = doc_mongo
+                
+        # 3. Buscar en la base local (alimentos.json)
         if stats is None and alimento in tabla_nutricional:
             data = tabla_nutricional[alimento]
             
-            # Chequear si es un diccionario válido (para ignorar los textos separadores _sec_)
             if isinstance(data, dict):
-                # Detectar si es categoría (es dict pero no tiene 'kcal')
                 if "kcal" not in data:
                     es_categoria = True
-                    
-                    # Lanzar botones inline
                     if user_id not in registro_temporal:
                         registro_temporal[user_id] = {}
                         
@@ -1289,7 +1420,6 @@ def calcular_macros(message):
                     
                     markup = InlineKeyboardMarkup()
                     for variante in data.keys():
-                        # Usamos cat_categoria_variante para identificar en el callback
                         markup.add(InlineKeyboardButton(variante.title(), callback_data=f"cat_{alimento}_{variante}"))
                         
                     bot.reply_to(message, f"¿Qué tipo de {alimento} es?", reply_markup=markup)
@@ -1297,9 +1427,17 @@ def calcular_macros(message):
                 else:
                     stats = data
             else:
-                pass # Es un separador como _sec_parrilla, se ignora y caerá en el 'else' final
+                pass
 
-        # 3. Fuzzy Matching
+        # 4. Consultar Open Food Facts API (Búsqueda global / Código de Barras)
+        if stats is None:
+            off_res = buscar_open_food_facts(alimento_raw)
+            if off_res:
+                stats = off_res
+                # Guardar automáticamente en MongoDB Global para futuras consultas de todos los usuarios
+                guardar_alimento_global(alimento, stats)
+
+        # 5. Fuzzy Matching
         if stats is None:
             opciones = list(tabla_nutricional.keys())
             if user_id in datos_usuarios and "mis_alimentos" in datos_usuarios[user_id]:
@@ -1321,10 +1459,10 @@ def calcular_macros(message):
                 )
                 bot.reply_to(message, f"No encontré '{alimento}'. ¿Quisiste decir **{sugerencias[0].title()}**?", reply_markup=markup, parse_mode="Markdown")
             else:
-                bot.reply_to(message, f"No encontré '{alimento}'. Tocá '⚙️ Herramientas' > '📦 Cargar Paquete' para agregarlo.", reply_markup=menu_principal())
+                bot.reply_to(message, f"No encontré '{alimento}'. Tocá '⚙️ Herramientas' > '📦 Cargar Paquete' para agregarlo o probá enviar una foto/código de barras.", reply_markup=menu_principal())
             return
 
-        # --- LOGICA DE UNIDADES VS GRAMOS ---
+        # --- LÓGICA DE UNIDADES VS GRAMOS ---
         cantidad_gramos = cantidad_num
         cantidad_str = f"{cantidad_num:g}g"
         
@@ -1333,15 +1471,17 @@ def calcular_macros(message):
                 cantidad_gramos = cantidad_num * stats["peso_unidad"]
                 cantidad_str = f"{cantidad_num:g} u"
                 
-        # Calcular macros
-        kcal = (stats["kcal"] * cantidad_gramos) / 100
-        prot = (stats["proteinas"] * cantidad_gramos) / 100
-        carb = (stats["carbos"] * cantidad_gramos) / 100
-        gras = (stats["grasas"] * cantidad_gramos) / 100
+        # Calcular macros y micronutrientes
+        kcal = (stats.get("kcal", 0) * cantidad_gramos) / 100
+        prot = (stats.get("proteinas", 0) * cantidad_gramos) / 100
+        carb = (stats.get("carbos", 0) * cantidad_gramos) / 100
+        gras = (stats.get("grasas", 0) * cantidad_gramos) / 100
+        fibra = (stats.get("fibra", 0) * cantidad_gramos) / 100
+        sodio = (stats.get("sodio", 0) * cantidad_gramos) / 100
         
         if user_id not in datos_usuarios:
             datos_usuarios[user_id] = {
-                "kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, 
+                "kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "fibra": 0, "sodio": 0,
                 "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": []
             }
             
@@ -1352,25 +1492,31 @@ def calcular_macros(message):
         datos_usuarios[user_id]["proteinas"] += prot
         datos_usuarios[user_id]["carbos"] += carb
         datos_usuarios[user_id]["grasas"] += gras
+        datos_usuarios[user_id]["fibra"] = datos_usuarios[user_id].get("fibra", 0) + fibra
+        datos_usuarios[user_id]["sodio"] = datos_usuarios[user_id].get("sodio", 0) + sodio
         
         nuevo_id = str(uuid.uuid4())[:8]
         datos_usuarios[user_id]["historial_hoy"].append({
             "id": nuevo_id,
             "alimento": alimento,
             "cantidad_str": cantidad_str,
-            "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras
+            "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras,
+            "fibra": fibra, "sodio": sodio
         })
         guardar_datos()
         
         markup_undo = InlineKeyboardMarkup()
         markup_undo.add(InlineKeyboardButton("↩️ Deshacer esto", callback_data=f"undo_{nuevo_id}"))
         
+        texto_fibra = f" (Fibra: {fibra:.1f}g 🌾)" if fibra > 0 else ""
+        
         respuesta = (f"🍗 Agregaste {cantidad_str} de {alimento.title()}:\n"
                      f"🔥 Kcal: {kcal:.0f}\n🥩 Proteínas: {prot:.1f}g\n"
-                     f"🍞 Carbos: {carb:.1f}g\n🥑 Grasas: {gras:.1f}g")
+                     f"🍞 Carbos: {carb:.1f}g{texto_fibra}\n🥑 Grasas: {gras:.1f}g")
                      
         bot.reply_to(message, respuesta, reply_markup=markup_undo)
-    except:
+    except Exception as e:
+        print(f"Error en calcular_macros: {e}")
         bot.reply_to(message, "Formato incorrecto. Usá: [cantidad] [alimento], ej: 100 pollo", reply_markup=menu_principal())
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("cat_"))
