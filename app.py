@@ -105,17 +105,37 @@ def guardar_datos():
 TOKEN = os.getenv('TELEGRAM_TOKEN', 'TU_TOKEN_ACA')
 bot = telebot.TeleBot(TOKEN, threaded=False)
 
+# Configurar comandos de menú oficial de Telegram
+try:
+    bot.set_my_commands([
+        telebot.types.BotCommand("start", "Iniciar bot y menú principal"),
+        telebot.types.BotCommand("resumen", "Ver resumen del día y barras de progreso"),
+        telebot.types.BotCommand("favoritos", "Ver tus comidas favoritas ('Lo de siempre')"),
+        telebot.types.BotCommand("perfil", "Configurar tu perfil y calcular metas TDEE"),
+        telebot.types.BotCommand("ia", "Consultar a la IA Nutricional"),
+        telebot.types.BotCommand("ayuda", "Guía de uso de comandos y atajos")
+    ])
+except Exception as e:
+    print(f"[WARN] No se pudieron registrar comandos oficiales: {e}")
+
 # ----------------- TECLADOS Y MENÚS -----------------
 def menu_principal():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("🍎 Registrar Comida", "📊 Mi Día")
-    markup.add("⚙️ Herramientas", "📝 Agregar Macros (IA)")
+    markup.add("⭐️ Favoritos", "📝 Agregar Macros (IA)")
+    markup.add("⚙️ Herramientas")
     return markup
 
 def menu_mi_dia():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("📊 Resumen de Macros", "📝 Ver lo que comí hoy")
     markup.add("🧹 Terminar Día", "🔙 Menú Principal")
+    return markup
+
+def menu_favoritos():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("⚡ Cargar Favorito", "➕ Guardar Favorito")
+    markup.add("🗑️ Borrar Favorito", "🔙 Menú Principal")
     return markup
 
 def menu_herramientas():
@@ -134,6 +154,18 @@ def boton_volver():
 def bienvenida(message):
     bot.reply_to(message, "¡Hola! Soy tu asistente nutricional. ¿Qué querés hacer hoy?", reply_markup=menu_principal())
 
+@bot.message_handler(commands=['ayuda'])
+def mostrar_ayuda(message):
+    texto = (
+        "❓ **Guía de Uso de MacroBot:**\n\n"
+        "1. 🍎 **Registrar Comidas**: Escribí `[cantidad] [alimento]` (ej: `150 pollo` o `2 u huevo`).\n"
+        "2. 🎤 **Notas de Voz**: ¡Mandale un audio al bot diciendo lo que comiste!\n"
+        "3. 📸 **Fotos**: Sacale foto a tu plato de comida o a una etiqueta nutricional.\n"
+        "4. ⭐️ **Favoritos**: Guardá tus desayunos o platos en '⭐️ Favoritos' para registrarlos en 1 clic.\n"
+        "5. 🤖 **IA Nutricional**: Preguntale qué cocinar con los ingredientes que tengas a mano."
+    )
+    bot.reply_to(message, texto, reply_markup=menu_principal(), parse_mode="Markdown")
+
 @bot.message_handler(func=lambda message: message.text == "🔙 Menú Principal")
 def volver_inicio(message):
     bot.reply_to(message, "Volviendo al inicio...", reply_markup=menu_principal())
@@ -148,7 +180,7 @@ def submenu_herramientas(message):
 
 @bot.message_handler(func=lambda message: message.text == "🍎 Registrar Comida")
 def instruccion_comida(message):
-    bot.reply_to(message, "Para registrar comida simplemente escribime:\n`[cantidad] [alimento]`\n\n*Ejemplos:*\n`150 pollo` (150 gramos)\n`2 u huevo` (2 unidades)", reply_markup=menu_principal(), parse_mode="Markdown")
+    bot.reply_to(message, "Para registrar comida simplemente escribime:\n`[cantidad] [alimento]`\n\n*Ejemplos:*\n`150 pollo` (150 gramos)\n`2 u huevo` (2 unidades)\n🎤 O simplemente ¡mandame una **nota de voz** o **foto de tu plato**!", reply_markup=menu_principal(), parse_mode="Markdown")
 
 # ----------------- BASE DE DATOS -----------------
 archivo_alimentos = os.path.join(BASE_DIR, "alimentos.json")
@@ -160,7 +192,6 @@ if os.path.exists(archivo_alimentos):
 else:
     tabla_nutricional = {}
     diccionario_alias = {}
-
 
 
 # ----------------- RESET DIARIO -----------------
@@ -179,6 +210,14 @@ def terminar_dia(message):
         bot.reply_to(message, "Todavía no cargaste nada.", reply_markup=menu_principal())
 
 # ----------------- RESUMEN Y ESTADO -----------------
+def generar_barra_progreso(actual, meta, bloques=10):
+    if meta <= 0:
+        return "░" * bloques
+    porcentaje = min(max(actual / meta, 0.0), 1.0)
+    llenos = int(round(porcentaje * bloques))
+    vacios = bloques - llenos
+    return "▓" * llenos + "░" * vacios
+
 @bot.message_handler(commands=['resumen'])
 @bot.message_handler(func=lambda message: message.text == "📊 Resumen de Macros")
 def mostrar_resumen(message):
@@ -189,17 +228,33 @@ def mostrar_resumen(message):
         meta_protes = datos.get("meta_proteinas", 160)
         meta_kcal = datos.get("meta_kcal", 2000)
         
-        faltan_protes = meta_protes - datos["proteinas"]
-        faltan_kcal = meta_kcal - datos["kcal"]
+        kcal_actual = datos.get("kcal", 0)
+        prot_actual = datos.get("proteinas", 0)
+        carb_actual = datos.get("carbos", 0)
+        gras_actual = datos.get("grasas", 0)
+        
+        faltan_protes = meta_protes - prot_actual
+        faltan_kcal = meta_kcal - kcal_actual
+        
+        pct_kcal = (kcal_actual / meta_kcal * 100) if meta_kcal > 0 else 0
+        pct_prot = (prot_actual / meta_protes * 100) if meta_protes > 0 else 0
+        
+        barra_kcal = generar_barra_progreso(kcal_actual, meta_kcal)
+        barra_prot = generar_barra_progreso(prot_actual, meta_protes)
         
         texto_protes = f"¡Pasaste la meta por {abs(faltan_protes):.1f}g!" if faltan_protes < 0 else f"Faltan {faltan_protes:.1f}g"
         texto_kcal = f"¡Te pasaste por {abs(faltan_kcal):.0f} kcal!" if faltan_kcal < 0 else f"Faltan {faltan_kcal:.0f} kcal"
         
-        bot.reply_to(message, f"📊 Resumen del día:\n\n"
-                              f"🔥 Kcal: {datos['kcal']:.0f} / {meta_kcal:.0f} ({texto_kcal})\n"
-                              f"🥩 Proteínas: {datos['proteinas']:.1f}g / {meta_protes:.1f}g ({texto_protes})\n"
-                              f"🍞 Carbos: {datos['carbos']:.1f}g\n"
-                              f"🥑 Grasas: {datos['grasas']:.1f}g", reply_markup=menu_mi_dia())
+        respuesta = (
+            f"📊 **Resumen del Día:**\n\n"
+            f"🔥 **Kcal:** [{barra_kcal}] {kcal_actual:.0f} / {meta_kcal:.0f} ({pct_kcal:.0f}%)\n"
+            f"👉 _{texto_kcal}_\n\n"
+            f"🥩 **Proteínas:** [{barra_prot}] {prot_actual:.1f} / {meta_protes:.1f}g ({pct_prot:.0f}%)\n"
+            f"👉 _{texto_protes}_\n\n"
+            f"🍞 **Carbos:** {carb_actual:.1f}g\n"
+            f"🥑 **Grasas:** {gras_actual:.1f}g"
+        )
+        bot.reply_to(message, respuesta, reply_markup=menu_mi_dia(), parse_mode="Markdown")
     else:
         bot.reply_to(message, "Che, todavía no cargaste nada de comida hoy.", reply_markup=menu_principal())
 
@@ -800,68 +855,350 @@ Devolvé EXCLUSIVAMENTE un objeto JSON válido, sin markdown, sin texto adiciona
         bot.reply_to(message, "Uy, no pude estimar la comida. Asegurate de escribir una comida válida y de que la API key funcione.", reply_markup=menu_principal())
 
 
-# ----------------- SCANNER VISUAL (ETIQUETAS) -----------------
-@bot.message_handler(content_types=['photo'])
-def leer_etiqueta(message):
+# ----------------- AUDIOS DE VOZ -----------------
+@bot.message_handler(content_types=['voice'])
+def procesar_audio_voz(message):
     user_id = str(message.from_user.id)
     try:
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key or api_key == "tu_api_key_de_gemini_aqui":
+            bot.reply_to(message, "⚠️ La API Key de Gemini no está configurada. Agregá GEMINI_API_KEY en las variables de entorno.", reply_markup=menu_principal())
+            return
+
         bot.send_chat_action(message.chat.id, 'typing')
-        # 1. Bajar la imagen
-        file_info = bot.get_file(message.photo[-1].file_id)
+        file_info = bot.get_file(message.voice.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         
-        # 2. Armar el prompt para JSON
-        prompt = """Sos un extractor de información nutricional. El usuario te pasa la foto de una etiqueta nutricional.
-Tu única tarea es extraer la información y devolverla EXCLUSIVAMENTE como un objeto JSON válido, sin markdown, sin texto adicional.
-El JSON debe tener exactamente esta estructura:
+        prompt = """Escuchá atentamente este mensaje de voz donde el usuario indica lo que comió o quiere registrar.
+Tu tarea es transcribir y extraer los alimentos y estimar sus macros (Kcal, proteínas, carbohidratos, grasas).
+Devolvé EXCLUSIVAMENTE un objeto JSON válido, sin markdown, con esta estructura:
 {
-  "es_etiqueta": true,
-  "porcion_gramos": 0.0,
+  "transcripcion": "Texto transcrito de lo que dijo el usuario",
+  "alimento": "Nombre del plato o resumen de la comida",
   "kcal": 0.0,
   "proteinas": 0.0,
   "carbos": 0.0,
-  "grasas": 0.0
-}
-Si la imagen no parece ser una etiqueta nutricional, poné "es_etiqueta": false y el resto en 0."""
+  "grasas": 0.0,
+  "explicacion": "Explicación breve de las porciones o estimaciones"
+}"""
 
-        # 3. Llamar a Gemini (SDK v2)
         response = gemini_client.models.generate_content(
             model='gemini-2.5-flash',
-            contents=[prompt, {"mime_type": "image/jpeg", "data": downloaded_file}],
+            contents=[prompt, {"mime_type": "audio/ogg", "data": downloaded_file}],
             config={'response_mime_type': 'application/json'}
         )
         
-        # 4. Parsear respuesta
         texto_limpio = response.text.strip()
         if texto_limpio.startswith("```json"):
             texto_limpio = texto_limpio.replace("```json", "").replace("```", "").strip()
             
         datos = json.loads(texto_limpio)
         
-        if not datos.get("es_etiqueta"):
-            bot.reply_to(message, "Hmm, no parece una etiqueta nutricional clara. Intentá sacar una foto más de cerca a la tablita.")
-            return
+        if user_id not in datos_usuarios:
+            datos_usuarios[user_id] = {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": []}
             
-        # 5. Guardar en memoria y pedir nombre
-        if user_id not in registro_temporal:
-            registro_temporal[user_id] = {}
-            
-        registro_temporal[user_id]['etiqueta_pendiente'] = datos
+        datos_usuarios[user_id]["estimacion_pendiente"] = {
+            "alimento": datos.get("alimento", "Comida registrada por voz"),
+            "kcal": float(datos.get("kcal", 0)),
+            "proteinas": float(datos.get("proteinas", 0)),
+            "carbos": float(datos.get("carbos", 0)),
+            "grasas": float(datos.get("grasas", 0))
+        }
+        guardar_datos()
         
-        respuesta = (f"🔍 **¡Etiqueta Leída con Éxito!**\n\n"
-                     f"Porción detectada: {datos.get('porcion_gramos', 0)}g\n"
-                     f"🔥 Kcal: {datos.get('kcal', 0)}\n"
-                     f"🥩 Proteínas: {datos.get('proteinas', 0)}g\n"
-                     f"🍞 Carbos: {datos.get('carbos', 0)}g\n"
-                     f"🥑 Grasas: {datos.get('grasas', 0)}g\n\n"
-                     f"¿Cómo querés llamar a este producto para guardarlo? (Ej: galletitas oreo, pan lactal)")
+        respuesta = (f"🎤 **Nota de Voz Entendida:**\n"
+                     f"💬 *\"{datos.get('transcripcion')}\"*\n\n"
+                     f"🍽️ **Plato:** {datos.get('alimento')}\n"
+                     f"🔥 **Kcal:** {datos.get('kcal', 0):.0f}\n"
+                     f"🥩 **Proteínas:** {datos.get('proteinas', 0):.1f}g\n"
+                     f"🍞 **Carbos:** {datos.get('carbos', 0):.1f}g\n"
+                     f"🥑 **Grasas:** {datos.get('grasas', 0):.1f}g\n\n"
+                     f"💡 *{datos.get('explicacion', '')}*\n\n"
+                     f"¿Querés registrar esta comida en tu día?")
                      
-        msg = bot.reply_to(message, respuesta, parse_mode="Markdown")
-        bot.register_next_step_handler(msg, paso_nombre_etiqueta)
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("✅ Registrar", callback_data="confirmar_ia"),
+            InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_ia")
+        )
+        
+        bot.reply_to(message, respuesta, reply_markup=markup, parse_mode="Markdown")
         
     except Exception as e:
-        print(f"Error OCR Etiqueta: {e}")
-        bot.reply_to(message, "Falló la lectura de la imagen. Asegurate de que la foto se vea clara y la API Key esté funcionando.")
+        print(f"Error Audio Voz: {e}")
+        bot.reply_to(message, "Uy, no pude procesar la nota de voz. Intentá hablar más claro o escribir el texto.", reply_markup=menu_principal())
+
+
+# ----------------- SCANNER VISUAL INTELIGENTE (ETIQUETAS Y PLATOS) -----------------
+@bot.message_handler(content_types=['photo'])
+def escanear_foto(message):
+    user_id = str(message.from_user.id)
+    try:
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key or api_key == "tu_api_key_de_gemini_aqui":
+            bot.reply_to(message, "⚠️ La API Key de Gemini no está configurada.", reply_markup=menu_principal())
+            return
+
+        bot.send_chat_action(message.chat.id, 'typing')
+        file_info = bot.get_file(message.photo[-1].file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        
+        prompt = """Analizá esta imagen. La imagen puede ser:
+1. Una ETIQUETA NUTRICIONAL (tabla o texto con calorías/nutrientes por porción).
+2. Un PLATO DE COMIDA / ALIMENTO (foto de comida preparada, fruta, carne, etc.).
+3. OTRO (no es ni etiqueta ni alimento).
+
+Devolvé EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
+{
+  "tipo": "etiqueta" | "plato" | "otro",
+  "alimento": "Nombre del plato si tipo es 'plato'",
+  "porcion_gramos": 0.0,
+  "kcal": 0.0,
+  "proteinas": 0.0,
+  "carbos": 0.0,
+  "grasas": 0.0,
+  "explicacion": "Explicación breve de la estimación si es plato"
+}"""
+
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[prompt, {"mime_type": "image/jpeg", "data": downloaded_file}],
+            config={'response_mime_type': 'application/json'}
+        )
+        
+        texto_limpio = response.text.strip()
+        if texto_limpio.startswith("```json"):
+            texto_limpio = texto_limpio.replace("```json", "").replace("```", "").strip()
+            
+        datos = json.loads(texto_limpio)
+        tipo = datos.get("tipo", "otro")
+        
+        if tipo == "etiqueta":
+            if user_id not in registro_temporal:
+                registro_temporal[user_id] = {}
+            registro_temporal[user_id]['etiqueta_pendiente'] = datos
+            
+            respuesta = (f"🔍 **¡Etiqueta Leída con Éxito!**\n\n"
+                         f"Porción detectada: {datos.get('porcion_gramos', 0)}g\n"
+                         f"🔥 Kcal: {datos.get('kcal', 0):.0f}\n"
+                         f"🥩 Proteínas: {datos.get('proteinas', 0):.1f}g\n"
+                         f"🍞 Carbos: {datos.get('carbos', 0):.1f}g\n"
+                         f"🥑 Grasas: {datos.get('grasas', 0):.1f}g\n\n"
+                         f"¿Cómo querés llamar a este producto para guardarlo en tu base personal? (Ej: galletitas oreo, pan lactal)")
+            msg = bot.reply_to(message, respuesta, parse_mode="Markdown")
+            bot.register_next_step_handler(msg, paso_nombre_etiqueta)
+
+        elif tipo == "plato":
+            if user_id not in datos_usuarios:
+                datos_usuarios[user_id] = {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": []}
+                
+            datos_usuarios[user_id]["estimacion_pendiente"] = {
+                "alimento": datos.get("alimento", "Plato reconocido por foto"),
+                "kcal": float(datos.get("kcal", 0)),
+                "proteinas": float(datos.get("proteinas", 0)),
+                "carbos": float(datos.get("carbos", 0)),
+                "grasas": float(datos.get("grasas", 0))
+            }
+            guardar_datos()
+            
+            respuesta = (f"📸 **Plato Reconocido por la IA:**\n"
+                         f"🍽️ **Plato:** {datos.get('alimento')}\n\n"
+                         f"🔥 **Kcal:** {datos.get('kcal', 0):.0f}\n"
+                         f"🥩 **Proteínas:** {datos.get('proteinas', 0):.1f}g\n"
+                         f"🍞 **Carbos:** {datos.get('carbos', 0):.1f}g\n"
+                         f"🥑 **Grasas:** {datos.get('grasas', 0):.1f}g\n\n"
+                         f"💡 *{datos.get('explicacion', '')}*\n\n"
+                         f"¿Querés registrar esta comida en tu día?")
+                         
+            markup = InlineKeyboardMarkup()
+            markup.add(
+                InlineKeyboardButton("✅ Registrar", callback_data="confirmar_ia"),
+                InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_ia")
+            )
+            bot.reply_to(message, respuesta, reply_markup=markup, parse_mode="Markdown")
+        else:
+            bot.reply_to(message, "Hmm, no detecté ni una etiqueta nutricional clara ni un plato de comida. Sacá una foto más cercana o iluminada.")
+
+    except Exception as e:
+        print(f"Error Scanner Visual: {e}")
+        bot.reply_to(message, "Falló el análisis de la imagen. Verificá que la foto sea clara y la API Key esté funcionando.")
+
+
+# ----------------- SISTEMA DE FAVORITOS ("LO DE SIEMPRE") -----------------
+@bot.message_handler(func=lambda message: message.text in ["⭐️ Favoritos", "⭐ Favoritos"])
+def submenu_favoritos(message):
+    bot.reply_to(message, "⭐️ **Comidas Favoritas ('Lo de siempre'):**\n\nGuardá tus desayunos o platos habituales para registrarlos rápidamente.", reply_markup=menu_favoritos(), parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: message.text == "⚡ Cargar Favorito")
+def listar_favoritos_para_cargar(message):
+    user_id = str(message.from_user.id)
+    favoritos = datos_usuarios.get(user_id, {}).get("favoritos", {})
+    
+    if not favoritos:
+        bot.reply_to(message, "No tenés ningún favorito guardado aún. Tocá '➕ Guardar Favorito' para agregar uno.", reply_markup=menu_favoritos())
+        return
+        
+    markup = InlineKeyboardMarkup()
+    for nombre in favoritos.keys():
+        markup.add(InlineKeyboardButton(f"⚡ {nombre.title()}", callback_data=f"favload_{nombre}"))
+        
+    bot.reply_to(message, "Seleccioná cuál favorito querés registrar hoy:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("favload_"))
+def cargar_favorito_callback(call):
+    user_id = str(call.from_user.id)
+    nombre_fav = call.data.split("_", 1)[1]
+    
+    favoritos = datos_usuarios.get(user_id, {}).get("favoritos", {})
+    if nombre_fav not in favoritos:
+        bot.answer_callback_query(call.id, "Ese favorito ya no existe.")
+        return
+        
+    fav = favoritos[nombre_fav]
+    kcal = fav.get("kcal", 0)
+    prot = fav.get("proteinas", 0)
+    carb = fav.get("carbos", 0)
+    gras = fav.get("grasas", 0)
+    
+    if user_id not in datos_usuarios:
+        datos_usuarios[user_id] = {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": []}
+    if "historial_hoy" not in datos_usuarios[user_id]:
+        datos_usuarios[user_id]["historial_hoy"] = []
+        
+    datos_usuarios[user_id]["kcal"] += kcal
+    datos_usuarios[user_id]["proteinas"] += prot
+    datos_usuarios[user_id]["carbos"] += carb
+    datos_usuarios[user_id]["grasas"] += gras
+    
+    nuevo_id = str(uuid.uuid4())[:8]
+    datos_usuarios[user_id]["historial_hoy"].append({
+        "id": nuevo_id,
+        "alimento": f"⭐️ {nombre_fav.title()}",
+        "cantidad_str": "1 combo",
+        "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras
+    })
+    guardar_datos()
+    
+    markup_undo = InlineKeyboardMarkup()
+    markup_undo.add(InlineKeyboardButton("↩️ Deshacer esto", callback_data=f"undo_{nuevo_id}"))
+    
+    respuesta = (f"⚡ Registraste tu favorito **{nombre_fav.title()}**:\n"
+                 f"🔥 Kcal: {kcal:.0f}\n🥩 Proteínas: {prot:.1f}g\n"
+                 f"🍞 Carbos: {carb:.1f}g\n🥑 Grasas: {gras:.1f}g")
+                 
+    bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=respuesta, reply_markup=markup_undo, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: message.text == "➕ Guardar Favorito")
+def iniciar_guardar_favorito(message):
+    msg = bot.reply_to(message, "¡Vamos a guardar un combo favorito!\n\n¿Qué nombre querés ponerle? (Ej: Desayuno Habitual, Merienda Proteica)", reply_markup=boton_volver())
+    bot.register_next_step_handler(msg, paso_nombre_favorito)
+
+def paso_nombre_favorito(message):
+    if message.text == "🔙 Volver":
+        bot.reply_to(message, "Cancelado.", reply_markup=menu_favoritos())
+        return
+        
+    nombre = message.text.lower().strip()
+    user_id = str(message.from_user.id)
+    if user_id not in registro_temporal:
+        registro_temporal[user_id] = {}
+    registro_temporal[user_id]['fav_nombre'] = nombre
+    
+    msg = bot.reply_to(message, f"Perfecto. ¿Qué alimentos incluye **{nombre.title()}**?\nDescribilo o decime las cantidades (Ej: `2 u huevo, 50g avena` o `300g pechuga con arroz`). La IA calculará los macros y guardará el combo.", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, paso_contenido_favorito)
+
+def paso_contenido_favorito(message):
+    user_id = str(message.from_user.id)
+    if message.text == "🔙 Volver":
+        bot.reply_to(message, "Cancelado.", reply_markup=menu_favoritos())
+        return
+        
+    nombre_fav = registro_temporal.get(user_id, {}).get('fav_nombre')
+    if not nombre_fav:
+        bot.reply_to(message, "Ocurrió un error. Volvé a iniciar la carga.", reply_markup=menu_favoritos())
+        return
+
+    prompt = f"""El usuario quiere definir un combo o alimento favorito llamado '{nombre_fav}' que contiene: '{message.text}'.
+Sos un nutricionista. Estima el total acumulado de macros (Kcal, proteínas, carbohidratos, grasas) para todo el combo completo.
+Devolvé EXCLUSIVAMENTE un objeto JSON válido, sin markdown:
+{{
+  "kcal": 0.0,
+  "proteinas": 0.0,
+  "carbos": 0.0,
+  "grasas": 0.0,
+  "explicacion": "Resumen corto de los alimentos sumados"
+}}"""
+
+    try:
+        bot.send_chat_action(message.chat.id, 'typing')
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config={'response_mime_type': 'application/json'}
+        )
+        
+        texto_limpio = response.text.strip()
+        if texto_limpio.startswith("```json"):
+            texto_limpio = texto_limpio.replace("```json", "").replace("```", "").strip()
+            
+        datos = json.loads(texto_limpio)
+        
+        if user_id not in datos_usuarios:
+            datos_usuarios[user_id] = {"kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "meta_proteinas": 160, "meta_kcal": 2000}
+        if "favoritos" not in datos_usuarios[user_id]:
+            datos_usuarios[user_id]["favoritos"] = {}
+            
+        datos_usuarios[user_id]["favoritos"][nombre_fav] = {
+            "kcal": float(datos.get("kcal", 0)),
+            "proteinas": float(datos.get("proteinas", 0)),
+            "carbos": float(datos.get("carbos", 0)),
+            "grasas": float(datos.get("grasas", 0))
+        }
+        guardar_datos()
+        
+        respuesta = (f"⭐️ **¡Favorito '{nombre_fav.title()}' guardado!**\n\n"
+                     f"🔥 Kcal: {datos.get('kcal', 0):.0f}\n"
+                     f"🥩 Proteínas: {datos.get('proteinas', 0):.1f}g\n"
+                     f"🍞 Carbos: {datos.get('carbos', 0):.1f}g\n"
+                     f"🥑 Grasas: {datos.get('grasas', 0):.1f}g\n\n"
+                     f"💡 *{datos.get('explicacion', '')}*\n\n"
+                     f"La próxima vez podés registrarlo al instante desde **⚡ Cargar Favorito**.")
+                     
+        bot.reply_to(message, respuesta, reply_markup=menu_favoritos(), parse_mode="Markdown")
+        
+    except Exception as e:
+        print(f"Error Guardar Favorito: {e}")
+        bot.reply_to(message, "Uy, hubo un error al calcular los macros de tu favorito. Probá de nuevo escribiendo los alimentos claramente.", reply_markup=menu_favoritos())
+
+@bot.message_handler(func=lambda message: message.text == "🗑️ Borrar Favorito")
+def iniciar_borrar_favorito(message):
+    user_id = str(message.from_user.id)
+    favoritos = datos_usuarios.get(user_id, {}).get("favoritos", {})
+    
+    if not favoritos:
+        bot.reply_to(message, "No tenés ningún favorito guardado.", reply_markup=menu_favoritos())
+        return
+        
+    markup = InlineKeyboardMarkup()
+    for nombre in favoritos.keys():
+        markup.add(InlineKeyboardButton(f"❌ Borrar {nombre.title()}", callback_data=f"favdel_{nombre}"))
+        
+    bot.reply_to(message, "Elegí el favorito que querés borrar:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("favdel_"))
+def borrar_favorito_callback(call):
+    user_id = str(call.from_user.id)
+    nombre_fav = call.data.split("_", 1)[1]
+    
+    if user_id in datos_usuarios and "favoritos" in datos_usuarios[user_id]:
+        if nombre_fav in datos_usuarios[user_id]["favoritos"]:
+            del datos_usuarios[user_id]["favoritos"][nombre_fav]
+            guardar_datos()
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f"🗑️ Favorito '{nombre_fav.title()}' borrado con éxito.")
+            return
+            
+    bot.answer_callback_query(call.id, "No se encontró el favorito.")
+
 
 def paso_nombre_etiqueta(message):
     user_id = str(message.from_user.id)
