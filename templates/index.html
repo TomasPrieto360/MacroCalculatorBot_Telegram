@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MacroBot - Control Nutricional</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="/static/icon-192.svg">
+    
+    <!-- Fuentes Google & Iconos -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- CSS Principal -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app" class="app-container">
+        <!-- Header Principal -->
+        <header class="app-header">
+            <div class="user-selector-container">
+                <i class="fa-solid fa-user-circle user-icon"></i>
+                <select id="userSelect" class="user-select">
+                    <option value="default">Cargando usuarios...</option>
+                </select>
+            </div>
+            <div class="header-actions">
+                <button id="btnRefresh" class="icon-btn" title="Actualizar"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+        </header>
+
+        <!-- Contenido Dinámico por Pestañas -->
+        <main class="app-content">
+            
+            <!-- PESTAÑA 1: INICIO (DASHBOARD) -->
+            <section id="tab-dashboard" class="tab-page active">
+                <!-- Tarjeta de Calorías Principal -->
+                <div class="card glass-card calorie-card">
+                    <div class="calorie-ring-container">
+                        <svg class="calorie-ring" viewBox="0 0 160 160">
+                            <circle class="ring-bg" cx="80" cy="80" r="70"></circle>
+                            <circle id="calorieProgress" class="ring-fill" cx="80" cy="80" r="70"></circle>
+                        </svg>
+                        <div class="calorie-text">
+                            <span id="kcalRemaining" class="kcal-number">0</span>
+                            <span class="kcal-label">kcal restantes</span>
+                        </div>
+                    </div>
+
+                    <div class="calorie-stats">
+                        <div class="stat-item">
+                            <span class="stat-title">Consumidas</span>
+                            <span id="kcalConsumed" class="stat-value text-orange">0</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <span class="stat-title">Meta Diaria</span>
+                            <span id="kcalGoal" class="stat-value">2000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barras de Macros (Proteínas, Carbos, Grasas) -->
+                <div class="card glass-card macros-card">
+                    <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Distribución de Macros</h3>
+                    
+                    <div class="macro-bar-container">
+                        <div class="macro-info">
+                            <span class="macro-name"><i class="fa-solid fa-drumstick-bite text-blue"></i> Proteínas</span>
+                            <span class="macro-val"><strong id="protCurrent">0</strong> / <span id="protGoal">160</span>g</span>
+                        </div>
+                        <div class="progress-track">
+                            <div id="protBar" class="progress-fill fill-blue" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="macro-bar-container">
+                        <div class="macro-info">
+                            <span class="macro-name"><i class="fa-solid fa-bread-slice text-green"></i> Carbohidratos</span>
+                            <span class="macro-val"><strong id="carbCurrent">0</strong>g</span>
+                        </div>
+                        <div class="progress-track">
+                            <div id="carbBar" class="progress-fill fill-green" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="macro-bar-container">
+                        <div class="macro-info">
+                            <span class="macro-name"><i class="fa-solid fa-avocado text-purple"></i> Grasas</span>
+                            <span class="macro-val"><strong id="fatCurrent">0</strong>g</span>
+                        </div>
+                        <div class="progress-track">
+                            <div id="fatBar" class="progress-fill fill-purple" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accesos Rápidos -->
+                <div class="quick-actions-grid">
+                    <button class="action-btn text-ai" onclick="switchTab('tab-ai')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>IA / Foto</span>
+                    </button>
+                    <button class="action-btn text-search" onclick="switchTab('tab-search')">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>Buscar</span>
+                    </button>
+                    <button class="action-btn text-diary" onclick="switchTab('tab-diary')">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Diario</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 2: BUSCADOR & REGISTRO -->
+            <section id="tab-search" class="tab-page">
+                <div class="card glass-card">
+                    <h3 class="card-title"><i class="fa-solid fa-magnifying-glass"></i> Registrar Alimento</h3>
+                    <div class="search-box">
+                        <i class="fa-solid fa-search search-icon"></i>
+                        <input type="text" id="searchInput" placeholder="Ej: Pollo, Manzana, 100g avena..." autocomplete="off">
+                        <button id="btnClearSearch" class="clear-btn hidden"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    
+                    <div id="searchResults" class="search-results-list">
+                        <div class="placeholder-msg">Buscá un alimento de tu base de datos o escanealo.</div>
+                    </div>
+                </div>
+
+                <!-- Modal / Formulario de cantidad al seleccionar alimento -->
+                <div id="logModal" class="modal hidden">
+                    <div class="modal-content glass-card">
+                        <h3 id="modalFoodTitle" class="modal-title">Nombre Alimento</h3>
+                        <p id="modalFoodMacros" class="modal-subtitle">100g: 0 kcal | 0g P | 0g C | 0g G</p>
+                        
+                        <div class="form-group">
+                            <label for="logQuantity">Cantidad:</label>
+                            <div class="quantity-input-group">
+                                <input type="number" id="logQuantity" value="100" min="1" step="1">
+                                <select id="logUnit">
+                                    <option value="g">Gramos (g)</option>
+                                    <option value="u">Unidades (u)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button id="btnCancelLog" class="btn btn-secondary">Cancelar</button>
+                            <button id="btnConfirmLog" class="btn btn-primary">Registrar</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 3: ASISTENTE IA & ESCÁNER DE FOTOS -->
+            <section id="tab-ai" class="tab-page">
+                <div class="card glass-card">
+                    <h3 class="card-title"><i class="fa-solid fa-robot text-orange"></i> Asistente Nutricional IA</h3>
+                    <p class="card-desc">Describí tu plato o cargá una foto de una etiqueta nutricional y la IA calculará los macros automáticamente.</p>
+                    
+                    <div class="ai-tabs">
+                        <button id="btnAiTextTab" class="ai-tab-btn active" onclick="switchAiMode('text')">
+                            <i class="fa-solid fa-pen-to-square"></i> Texto / Voz
+                        </button>
+                        <button id="btnAiPhotoTab" class="ai-tab-btn" onclick="switchAiMode('photo')">
+                            <i class="fa-solid fa-camera"></i> Etiqueta / Foto
+                        </button>
+                    </div>
+
+                    <!-- Modo Texto -->
+                    <div id="aiModeText" class="ai-mode-container">
+                        <textarea id="aiTextInput" placeholder="Ej: Me comí 2 milanesas de pollo con ensalada de tomate y lechuga"></textarea>
+                        <button id="btnSubmitAiText" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-sparkles"></i> Analizar con IA
+                        </button>
+                    </div>
+
+                    <!-- Modo Foto -->
+                    <div id="aiModePhoto" class="ai-mode-container hidden">
+                        <div class="file-upload-zone" onclick="document.getElementById('aiPhotoInput').click()">
+                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                            <p id="uploadText">Toca para seleccionar foto de etiqueta</p>
+                            <input type="file" id="aiPhotoInput" accept="image/*" class="hidden">
+                        </div>
+                        <div id="imagePreviewContainer" class="hidden">
+                            <img id="imagePreview" src="" alt="Preview">
+                        </div>
+                        <button id="btnSubmitAiPhoto" class="btn btn-primary btn-block" disabled>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Escanear Etiqueta
+                        </button>
+                    </div>
+
+                    <!-- Resultado de la IA -->
+                    <div id="aiResultBox" class="ai-result-card hidden">
+                        <h4 class="result-title"><i class="fa-solid fa-circle-check text-green"></i> Resultado IA</h4>
+                        <div id="aiResultContent" class="result-body"></div>
+                        <button id="btnLogAiResult" class="btn btn-success btn-block margin-top">
+                            <i class="fa-solid fa-plus"></i> Agregar al Diario
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 4: DIARIO (HISTORIAL) -->
+            <section id="tab-diary" class="tab-page">
+                <div class="card glass-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title"><i class="fa-solid fa-calendar-day"></i> Registros de Hoy</h3>
+                        <span id="historyCount" class="badge">0 comidas</span>
+                    </div>
+
+                    <div id="historyList" class="history-list">
+                        <div class="placeholder-msg">Aún no registraste alimentos hoy.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 5: PERFIL Y TDEE -->
+            <section id="tab-profile" class="tab-page">
+                <div class="card glass-card">
+                    <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Calculadora TDEE y Metas</h3>
+                    
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label for="profGoalKcal">Meta Calorías Diarias (kcal):</label>
+                            <input type="number" id="profGoalKcal" value="2000" min="1000" max="8000">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profGoalProt">Meta Proteínas (g):</label>
+                            <input type="number" id="profGoalProt" value="160" min="30" max="400">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Navegación Inferior Móvil (Bottom Nav) -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="switchTab('tab-dashboard')">
+                <i class="fa-solid fa-house"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('tab-search')">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Buscar</span>
+            </button>
+            <button class="nav-item nav-ai-btn" onclick="switchTab('tab-ai')">
+                <div class="ai-icon-circle"><i class="fa-solid fa-wand-sparkles"></i></div>
+                <span>IA</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('tab-diary')">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Diario</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('tab-profile')">
+                <i class="fa-solid fa-user"></i>
+                <span>Perfil</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Script Principal JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

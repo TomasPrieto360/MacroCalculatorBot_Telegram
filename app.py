@@ -239,6 +239,11 @@ except Exception as e:
 # ----------------- TECLADOS Y MENÚS -----------------
 def menu_principal():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    web_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:10000")
+    try:
+        markup.add(KeyboardButton("📱 Abrir App Web", web_app=telebot.types.WebAppInfo(url=web_url)))
+    except Exception as e:
+        print(f"[WARN] WebAppInfo no disponible: {e}")
     markup.add("🍎 Registrar Comida", "📊 Mi Día")
     markup.add("⭐️ Favoritos", "📝 Agregar Macros (IA)")
     markup.add("⚙️ Herramientas")
@@ -1764,20 +1769,264 @@ def manejar_fuzzy(call):
         del registro_temporal[user_id]['fuzzy_unidad_str']
 
 import time
-from flask import Flask, request
+import base64
+from flask import Flask, request, jsonify, render_template
 
-# Configuración del servidor Web para Render/Production
-app = Flask(__name__)
+# Configuración del servidor Web para Render/Production/PWA
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
-# Ruta base para chequear que la app está viva
+# Ruta base PWA (Servir App Móvil)
 @app.route('/')
+@app.route('/app')
 def index():
-    return "MacroBot funcionando 24/7 con MongoDB", 200
+    return render_template('index.html')
 
 # Ruta de health check para Render
 @app.route('/health')
 def health():
-    return {"status": "ok"}, 200
+    return jsonify({"status": "ok", "mongo": mongo_available}), 200
+
+# Endpoint API: Obtener lista de usuarios para el selector
+@app.route('/api/users')
+def api_get_users():
+    users = []
+    if col_usuarios is not None:
+        try:
+            for doc in col_usuarios.find({}, {"_id": 1, "nombre": 1}):
+                users.append({"id": doc["_id"], "name": doc.get("nombre") or f"Usuario {doc['_id']}"})
+        except Exception as e:
+            print(f"[WARN] Error api_get_users: {e}")
+    if not users:
+        for uid in datos_usuarios.keys():
+            users.append({"id": str(uid), "name": f"Usuario {uid}"})
+    if not users:
+        users = [{"id": "defecto", "name": "Usuario Principal"}]
+    return jsonify(users)
+
+# Endpoint API: Obtener datos completos de un usuario
+@app.route('/api/user/<user_id>')
+def api_get_user(user_id):
+    u_data = datos_usuarios[user_id]
+    return jsonify({
+        "user_id": str(user_id),
+        "kcal": u_data.get("kcal", 0),
+        "proteinas": u_data.get("proteinas", 0),
+        "carbos": u_data.get("carbos", 0),
+        "grasas": u_data.get("grasas", 0),
+        "meta_kcal": u_data.get("meta_kcal", 2000),
+        "meta_proteinas": u_data.get("meta_proteinas", 160),
+        "historial_hoy": u_data.get("historial_hoy", []),
+        "mis_alimentos": u_data.get("mis_alimentos", {})
+    })
+
+# Endpoint API: Registrar alimento
+@app.route('/api/user/<user_id>/log', methods=['POST'])
+def api_log_food(user_id):
+    req_data = request.get_json() or {}
+    alimento = str(req_data.get("alimento", "Comida")).lower().strip()
+    cantidad = float(req_data.get("cantidad", 100))
+    unidad = str(req_data.get("unidad", "g"))
+    stats = req_data.get("stats") or {}
+    
+    if not stats or "kcal" not in stats:
+        found = buscar_alimento_mongo_global(alimento)
+        if found:
+            stats = found
+        elif alimento in tabla_nutricional:
+            stats = tabla_nutricional[alimento]
+            
+    kcal_100 = float(stats.get("kcal", 0))
+    prot_100 = float(stats.get("proteinas", 0))
+    carb_100 = float(stats.get("carbos", 0))
+    gras_100 = float(stats.get("grasas", 0))
+    
+    cantidad_gramos = cantidad
+    cantidad_str = f"{cantidad:g}g"
+    if unidad in ["u", "unidades", "unidad"] and "peso_unidad" in stats:
+        cantidad_gramos = cantidad * float(stats["peso_unidad"])
+        cantidad_str = f"{cantidad:g} u"
+        
+    kcal = (kcal_100 * cantidad_gramos) / 100
+    prot = (prot_100 * cantidad_gramos) / 100
+    carb = (carb_100 * cantidad_gramos) / 100
+    gras = (gras_100 * cantidad_gramos) / 100
+    
+    u_data = datos_usuarios[user_id]
+    u_data["kcal"] = u_data.get("kcal", 0) + kcal
+    u_data["proteinas"] = u_data.get("proteinas", 0) + prot
+    u_data["carbos"] = u_data.get("carbos", 0) + carb
+    u_data["grasas"] = u_data.get("grasas", 0) + gras
+    
+    if "historial_hoy" not in u_data:
+        u_data["historial_hoy"] = []
+        
+    item_id = str(uuid.uuid4())[:8]
+    item = {
+        "id": item_id,
+        "alimento": alimento,
+        "cantidad_str": cantidad_str,
+        "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras
+    }
+    u_data["historial_hoy"].append(item)
+    guardar_datos()
+    
+    return jsonify({"status": "ok", "item": item})
+
+# Endpoint API: Borrar alimento del historial
+@app.route('/api/user/<user_id>/history/<item_id>', methods=['DELETE'])
+def api_delete_history(user_id, item_id):
+    u_data = datos_usuarios[user_id]
+    historial = u_data.get("historial_hoy", [])
+    item_to_remove = None
+    for item in historial:
+        if item.get("id") == item_id:
+            item_to_remove = item
+            break
+            
+    if item_to_remove:
+        historial.remove(item_to_remove)
+        u_data["kcal"] = max(0, u_data.get("kcal", 0) - item_to_remove.get("kcal", 0))
+        u_data["proteinas"] = max(0, u_data.get("proteinas", 0) - item_to_remove.get("proteinas", 0))
+        u_data["carbos"] = max(0, u_data.get("carbos", 0) - item_to_remove.get("carbos", 0))
+        u_data["grasas"] = max(0, u_data.get("grasas", 0) - item_to_remove.get("grasas", 0))
+        guardar_datos()
+        return jsonify({"status": "ok"})
+        
+    return jsonify({"status": "error", "message": "Registro no encontrado"}), 404
+
+# Endpoint API: Actualizar configuración de perfil TDEE / Metas
+@app.route('/api/user/<user_id>/profile', methods=['POST'])
+def api_update_profile(user_id):
+    req_data = request.get_json() or {}
+    u_data = datos_usuarios[user_id]
+    if "meta_kcal" in req_data:
+        u_data["meta_kcal"] = float(req_data["meta_kcal"])
+    if "meta_proteinas" in req_data:
+        u_data["meta_proteinas"] = float(req_data["meta_proteinas"])
+    guardar_datos()
+    return jsonify({"status": "ok"})
+
+# Endpoint API: Búsqueda unificada de alimentos
+@app.route('/api/search')
+def api_search():
+    q = request.args.get('q', '').strip().lower()
+    if not q:
+        return jsonify([])
+        
+    results = []
+    seen = set()
+    
+    # 1. Alimentos en tabla local
+    if isinstance(tabla_nutricional, dict):
+        for k, v in tabla_nutricional.items():
+            if q in k.lower() and isinstance(v, dict) and "kcal" in v:
+                results.append({
+                    "alimento": k,
+                    "kcal": v.get("kcal", 0),
+                    "proteinas": v.get("proteinas", 0),
+                    "carbos": v.get("carbos", 0),
+                    "grasas": v.get("grasas", 0),
+                    "fuente": "local"
+                })
+                seen.add(k.lower())
+                if len(results) >= 8:
+                    break
+                    
+    # 2. MongoDB Global
+    if col_alimentos is not None and len(results) < 10:
+        try:
+            for doc in col_alimentos.find({"_id": {"$regex": q, "$options": "i"}}).limit(5):
+                if doc["_id"].lower() not in seen:
+                    results.append({
+                        "alimento": doc["_id"],
+                        "kcal": doc.get("kcal", 0),
+                        "proteinas": doc.get("proteinas", 0),
+                        "carbos": doc.get("carbos", 0),
+                        "grasas": doc.get("grasas", 0),
+                        "fuente": "mongo"
+                    })
+                    seen.add(doc["_id"].lower())
+        except Exception as e:
+            print(f"[WARN] Error search mongo: {e}")
+            
+    # 3. Open Food Facts
+    if len(results) < 3:
+        off_item = buscar_open_food_facts(q)
+        if off_item and off_item["alimento"] not in seen:
+            results.append(off_item)
+            
+    return jsonify(results)
+
+# Endpoint API: Interpretar comida por texto libre con Gemini IA
+@app.route('/api/ai/parse-food', methods=['POST'])
+def api_parse_food():
+    req_data = request.get_json() or {}
+    text = req_data.get("text", "").strip()
+    if not text:
+        return jsonify({"status": "error", "message": "Texto vacío"}), 400
+        
+    try:
+        prompt = (
+            f"Analizá la siguiente descripción de comida: '{text}'.\n"
+            "Devuelve ÚNICAMENTE un objeto JSON válido con este formato exacto:\n"
+            "{\n"
+            '  "alimento": "descripción corta del plato",\n'
+            '  "kcal": 000,\n'
+            '  "proteinas": 00.0,\n'
+            '  "carbos": 00.0,\n'
+            '  "grasas": 00.0\n'
+            "}\n"
+            "No incluyas formato Markdown ni texto extra. Solo el JSON."
+        )
+        res = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw_text)
+        return jsonify({"status": "ok", "parsed": parsed})
+    except Exception as e:
+        print(f"[ERROR] API Gemini Parse: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Endpoint API: Escanear etiqueta con Gemini Vision
+@app.route('/api/ai/scan-label', methods=['POST'])
+def api_scan_label():
+    req_data = request.get_json() or {}
+    img_b64 = req_data.get("image_base64", "")
+    if not img_b64:
+        return jsonify({"status": "error", "message": "Imagen no enviada"}), 400
+        
+    try:
+        img_bytes = base64.b64decode(img_b64)
+        prompt = (
+            "Analizá la etiqueta nutricional en la imagen. "
+            "Extraé los valores POR 100g/100ml.\n"
+            "Devuelve ÚNICAMENTE un JSON válido con este formato exacto:\n"
+            "{\n"
+            '  "alimento": "nombre del producto o marca",\n'
+            '  "kcal": 000,\n'
+            '  "proteinas": 00.0,\n'
+            '  "carbos": 00.0,\n'
+            '  "grasas": 00.0\n'
+            "}\n"
+            "Solo responde con el objeto JSON."
+        )
+        
+        from google.genai import types
+        res = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                prompt
+            ]
+        )
+        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw_text)
+        return jsonify({"status": "ok", "parsed": parsed})
+    except Exception as e:
+        print(f"[ERROR] API Gemini Label Scan: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Ruta oculta donde Telegram manda los mensajes
 @app.route('/' + TOKEN, methods=['POST'])
