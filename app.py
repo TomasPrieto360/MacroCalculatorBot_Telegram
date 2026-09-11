@@ -180,7 +180,8 @@ def get_user(user_id):
             print(f"[WARN] Error leyendo usuario: {e}")
     return {
         "kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "fibra": 0, "sodio": 0,
-        "meta_proteinas": 160, "meta_kcal": 2000, "historial_hoy": [], "mis_alimentos": {}
+        "meta_proteinas": 160, "meta_kcal": 2000, "meta_carbos": 250, "meta_grasas": 65,
+        "racha_dias": 0, "historial_hoy": [], "historial_dias": [], "mis_alimentos": {}, "favoritos": {}, "perfil_fisico": {}
     }
 
 def save_user(user_id, data):
@@ -1809,13 +1810,20 @@ def api_get_user(user_id):
     u_data = datos_usuarios[user_id]
     return jsonify({
         "user_id": str(user_id),
-        "kcal": u_data.get("kcal", 0),
-        "proteinas": u_data.get("proteinas", 0),
-        "carbos": u_data.get("carbos", 0),
-        "grasas": u_data.get("grasas", 0),
+        "nombre": u_data.get("nombre") or f"Usuario {user_id}",
+        "kcal": round(u_data.get("kcal", 0), 1),
+        "proteinas": round(u_data.get("proteinas", 0), 1),
+        "carbos": round(u_data.get("carbos", 0), 1),
+        "grasas": round(u_data.get("grasas", 0), 1),
         "meta_kcal": u_data.get("meta_kcal", 2000),
         "meta_proteinas": u_data.get("meta_proteinas", 160),
+        "meta_carbos": u_data.get("meta_carbos", 250),
+        "meta_grasas": u_data.get("meta_grasas", 65),
+        "racha_dias": u_data.get("racha_dias", 0),
         "historial_hoy": u_data.get("historial_hoy", []),
+        "historial_dias": u_data.get("historial_dias", []),
+        "favoritos": u_data.get("favoritos", {}),
+        "perfil_fisico": u_data.get("perfil_fisico", {}),
         "mis_alimentos": u_data.get("mis_alimentos", {})
     })
 
@@ -1846,16 +1854,16 @@ def api_log_food(user_id):
         cantidad_gramos = cantidad * float(stats["peso_unidad"])
         cantidad_str = f"{cantidad:g} u"
         
-    kcal = (kcal_100 * cantidad_gramos) / 100
-    prot = (prot_100 * cantidad_gramos) / 100
-    carb = (carb_100 * cantidad_gramos) / 100
-    gras = (gras_100 * cantidad_gramos) / 100
+    kcal = round((kcal_100 * cantidad_gramos) / 100, 1)
+    prot = round((prot_100 * cantidad_gramos) / 100, 1)
+    carb = round((carb_100 * cantidad_gramos) / 100, 1)
+    gras = round((gras_100 * cantidad_gramos) / 100, 1)
     
     u_data = datos_usuarios[user_id]
-    u_data["kcal"] = u_data.get("kcal", 0) + kcal
-    u_data["proteinas"] = u_data.get("proteinas", 0) + prot
-    u_data["carbos"] = u_data.get("carbos", 0) + carb
-    u_data["grasas"] = u_data.get("grasas", 0) + gras
+    u_data["kcal"] = round(u_data.get("kcal", 0) + kcal, 1)
+    u_data["proteinas"] = round(u_data.get("proteinas", 0) + prot, 1)
+    u_data["carbos"] = round(u_data.get("carbos", 0) + carb, 1)
+    u_data["grasas"] = round(u_data.get("grasas", 0) + gras, 1)
     
     if "historial_hoy" not in u_data:
         u_data["historial_hoy"] = []
@@ -1872,7 +1880,7 @@ def api_log_food(user_id):
     
     return jsonify({"status": "ok", "item": item})
 
-# Endpoint API: Borrar alimento del historial
+# Endpoint API: Borrar alimento del historial de hoy
 @app.route('/api/user/<user_id>/history/<item_id>', methods=['DELETE'])
 def api_delete_history(user_id, item_id):
     u_data = datos_usuarios[user_id]
@@ -1885,10 +1893,10 @@ def api_delete_history(user_id, item_id):
             
     if item_to_remove:
         historial.remove(item_to_remove)
-        u_data["kcal"] = max(0, u_data.get("kcal", 0) - item_to_remove.get("kcal", 0))
-        u_data["proteinas"] = max(0, u_data.get("proteinas", 0) - item_to_remove.get("proteinas", 0))
-        u_data["carbos"] = max(0, u_data.get("carbos", 0) - item_to_remove.get("carbos", 0))
-        u_data["grasas"] = max(0, u_data.get("grasas", 0) - item_to_remove.get("grasas", 0))
+        u_data["kcal"] = max(0, round(u_data.get("kcal", 0) - item_to_remove.get("kcal", 0), 1))
+        u_data["proteinas"] = max(0, round(u_data.get("proteinas", 0) - item_to_remove.get("proteinas", 0), 1))
+        u_data["carbos"] = max(0, round(u_data.get("carbos", 0) - item_to_remove.get("carbos", 0), 1))
+        u_data["grasas"] = max(0, round(u_data.get("grasas", 0) - item_to_remove.get("grasas", 0), 1))
         guardar_datos()
         return jsonify({"status": "ok"})
         
@@ -1899,12 +1907,161 @@ def api_delete_history(user_id, item_id):
 def api_update_profile(user_id):
     req_data = request.get_json() or {}
     u_data = datos_usuarios[user_id]
+    if "nombre" in req_data:
+        u_data["nombre"] = str(req_data["nombre"]).strip()
     if "meta_kcal" in req_data:
         u_data["meta_kcal"] = float(req_data["meta_kcal"])
     if "meta_proteinas" in req_data:
         u_data["meta_proteinas"] = float(req_data["meta_proteinas"])
+    if "meta_carbos" in req_data:
+        u_data["meta_carbos"] = float(req_data["meta_carbos"])
+    if "meta_grasas" in req_data:
+        u_data["meta_grasas"] = float(req_data["meta_grasas"])
     guardar_datos()
     return jsonify({"status": "ok"})
+
+# Endpoint API: Calcular TDEE e instalar metas personales
+@app.route('/api/user/<user_id>/calculate-tdee', methods=['POST'])
+def api_calculate_tdee(user_id):
+    req_data = request.get_json() or {}
+    try:
+        peso = float(req_data.get("peso", 70))
+        altura = float(req_data.get("altura", 170))
+        edad = float(req_data.get("edad", 25))
+        sexo = str(req_data.get("sexo", "m")).strip().lower()
+        actividad = str(req_data.get("actividad", "moderado")).strip().lower()
+        objetivo = str(req_data.get("objetivo", "mantener")).strip().lower()
+
+        # Mifflin-St Jeor
+        bmr = (10 * peso) + (6.25 * altura) - (5 * edad) + (5 if sexo == 'm' else -161)
+        mult_dict = {
+            "sedentario": 1.2,
+            "ligero": 1.375,
+            "moderado": 1.55,
+            "intenso": 1.725,
+            "extremo": 1.9
+        }
+        mult = mult_dict.get(actividad, 1.55)
+        tdee = bmr * mult
+
+        if objetivo == "perder":
+            meta_kcal = round(tdee - 400)
+        elif objetivo == "ganar":
+            meta_kcal = round(tdee + 300)
+        else:
+            meta_kcal = round(tdee)
+
+        # Reparto de macros
+        prot_g = round(peso * (2.0 if actividad in ["moderado", "intenso", "extremo"] else 1.8))
+        fat_g = round((meta_kcal * 0.25) / 9)
+        carb_g = max(50, round((meta_kcal - (prot_g * 4 + fat_g * 9)) / 4))
+
+        u_data = datos_usuarios[user_id]
+        u_data["meta_kcal"] = meta_kcal
+        u_data["meta_proteinas"] = prot_g
+        u_data["meta_carbos"] = carb_g
+        u_data["meta_grasas"] = fat_g
+        u_data["perfil_fisico"] = {
+            "peso": peso, "altura": altura, "edad": edad,
+            "sexo": sexo, "actividad": actividad, "objetivo": objetivo, "tdee": round(tdee)
+        }
+        guardar_datos()
+        return jsonify({
+            "status": "ok",
+            "meta_kcal": meta_kcal,
+            "meta_proteinas": prot_g,
+            "meta_carbos": carb_g,
+            "meta_grasas": fat_g,
+            "tdee": round(tdee)
+        })
+    except Exception as e:
+        print(f"[ERROR] API TDEE: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+# Endpoint API: Terminar Día (Cerrar día, guardar historial y resetear)
+@app.route('/api/user/<user_id>/close-day', methods=['POST'])
+def api_close_day(user_id):
+    u_data = datos_usuarios[user_id]
+    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    
+    consumed_kcal = round(u_data.get("kcal", 0), 1)
+    consumed_prot = round(u_data.get("proteinas", 0), 1)
+    consumed_carb = round(u_data.get("carbos", 0), 1)
+    consumed_gras = round(u_data.get("grasas", 0), 1)
+    meta_k = u_data.get("meta_kcal", 2000)
+    
+    # Evaluar si cumplió la meta (dentro de +-15% de margen)
+    cumplido = abs(consumed_kcal - meta_k) <= (meta_k * 0.15) or (consumed_kcal >= meta_k * 0.85 and consumed_kcal <= meta_k * 1.15)
+    
+    racha = u_data.get("racha_dias", 0)
+    if cumplido:
+        racha += 1
+    else:
+        racha = 0
+    u_data["racha_dias"] = racha
+
+    registro_dia = {
+        "fecha": fecha_hoy,
+        "kcal": consumed_kcal,
+        "proteinas": consumed_prot,
+        "carbos": consumed_carb,
+        "grasas": consumed_gras,
+        "meta_kcal": meta_k,
+        "comidas_count": len(u_data.get("historial_hoy", [])),
+        "cumplido": cumplido
+    }
+    
+    if "historial_dias" not in u_data:
+        u_data["historial_dias"] = []
+    u_data["historial_dias"].insert(0, registro_dia)
+    # Limitar historial guardado a 90 días
+    u_data["historial_dias"] = u_data["historial_dias"][:90]
+
+    # Resetear día actual
+    u_data["kcal"] = 0
+    u_data["proteinas"] = 0
+    u_data["carbos"] = 0
+    u_data["grasas"] = 0
+    u_data["historial_hoy"] = []
+    
+    guardar_datos()
+    return jsonify({
+        "status": "ok",
+        "resumen": registro_dia,
+        "racha_dias": racha
+    })
+
+# Endpoint API: Favoritos del usuario
+@app.route('/api/user/<user_id>/favorites', methods=['GET', 'POST', 'DELETE'])
+def api_favorites(user_id):
+    u_data = datos_usuarios[user_id]
+    if "favoritos" not in u_data:
+        u_data["favoritos"] = {}
+        
+    if request.method == 'GET':
+        return jsonify(u_data["favoritos"])
+        
+    elif request.method == 'POST':
+        req_data = request.get_json() or {}
+        nombre = str(req_data.get("nombre", "")).strip()
+        if not nombre:
+            return jsonify({"status": "error", "message": "Nombre requerido"}), 400
+        u_data["favoritos"][nombre.lower()] = {
+            "nombre": nombre,
+            "kcal": float(req_data.get("kcal", 0)),
+            "proteinas": float(req_data.get("proteinas", 0)),
+            "carbos": float(req_data.get("carbos", 0)),
+            "grasas": float(req_data.get("grasas", 0))
+        }
+        guardar_datos()
+        return jsonify({"status": "ok", "favoritos": u_data["favoritos"]})
+        
+    elif request.method == 'DELETE':
+        nombre = request.args.get("nombre", "").strip().lower()
+        if nombre in u_data["favoritos"]:
+            del u_data["favoritos"][nombre]
+            guardar_datos()
+        return jsonify({"status": "ok", "favoritos": u_data["favoritos"]})
 
 # Endpoint API: Búsqueda unificada de alimentos
 @app.route('/api/search')
@@ -1989,19 +2146,74 @@ def api_parse_food():
         print(f"[ERROR] API Gemini Parse: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Endpoint API: Escanear etiqueta con Gemini Vision
-@app.route('/api/ai/scan-label', methods=['POST'])
-def api_scan_label():
+# Endpoint API: Analizar Foto de Comida con IA Vision + Texto de ayuda opcional
+@app.route('/api/ai/scan-meal-photo', methods=['POST'])
+def api_scan_meal_photo():
     req_data = request.get_json() or {}
     img_b64 = req_data.get("image_base64", "")
+    text_hint = req_data.get("text_hint", "").strip()
+    
     if not img_b64:
         return jsonify({"status": "error", "message": "Imagen no enviada"}), 400
         
     try:
+        # Remover prefijo data:image/...;base64, si existe
+        if "," in img_b64:
+            img_b64 = img_b64.split(",", 1)[1]
+            
+        img_bytes = base64.b64decode(img_b64)
+        
+        prompt = (
+            "Analizá cuidadosamente la foto de este plato de comida.\n"
+            + (f"DETALLES ADICIONALES DADOS POR EL USUARIO PARA AYUDAR AL ANÁLISIS: '{text_hint}'.\n" if text_hint else "") +
+            "Identificá el alimento o preparación, estimá el tamaño de porción realista en gramos y calculá las calorías y macronutrientes totales.\n"
+            "Devuelve ÚNICAMENTE un objeto JSON válido con este formato exacto:\n"
+            "{\n"
+            '  "alimento": "Nombre del plato (ej: Milanesa de pollo con puré)",\n'
+            '  "cantidad_estimada_g": 250,\n'
+            '  "kcal": 450,\n'
+            '  "proteinas": 35.0,\n'
+            '  "carbos": 40.0,\n'
+            '  "grasas": 15.0,\n'
+            '  "confianza": "Alta"\n'
+            "}\n"
+            "Solo responde con el objeto JSON. Sin código markdown adicional."
+        )
+        
+        from google.genai import types
+        res = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                prompt
+            ]
+        )
+        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw_text)
+        return jsonify({"status": "ok", "parsed": parsed})
+    except Exception as e:
+        print(f"[ERROR] API Scan Meal Photo: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Endpoint API: Escanear etiqueta con Gemini Vision + Texto opcional
+@app.route('/api/ai/scan-label', methods=['POST'])
+def api_scan_label():
+    req_data = request.get_json() or {}
+    img_b64 = req_data.get("image_base64", "")
+    text_hint = req_data.get("text_hint", "").strip()
+    
+    if not img_b64:
+        return jsonify({"status": "error", "message": "Imagen no enviada"}), 400
+        
+    try:
+        if "," in img_b64:
+            img_b64 = img_b64.split(",", 1)[1]
+            
         img_bytes = base64.b64decode(img_b64)
         prompt = (
             "Analizá la etiqueta nutricional en la imagen. "
-            "Extraé los valores POR 100g/100ml.\n"
+            "Extraé los valores por 100g / 100ml.\n"
+            + (f"PISTA ADICIONAL O NOMBRE DEL PRODUCTO DADO POR EL USUARIO: '{text_hint}'.\n" if text_hint else "") +
             "Devuelve ÚNICAMENTE un JSON válido con este formato exacto:\n"
             "{\n"
             '  "alimento": "nombre del producto o marca",\n'
@@ -2026,6 +2238,47 @@ def api_scan_label():
         return jsonify({"status": "ok", "parsed": parsed})
     except Exception as e:
         print(f"[ERROR] API Gemini Label Scan: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Endpoint API: Recetas de Heladera con IA
+@app.route('/api/ai/fridge-recipes', methods=['POST'])
+def api_fridge_recipes():
+    req_data = request.get_json() or {}
+    ingredientes = req_data.get("ingredientes", [])
+    kcal_rem = req_data.get("kcal_rem", 600)
+    prot_rem = req_data.get("prot_rem", 40)
+    
+    if not ingredientes:
+        return jsonify({"status": "error", "message": "Ingredientes requeridos"}), 400
+        
+    try:
+        prompt = (
+            f"Tengo los siguientes ingredientes disponibles: {', '.join(ingredientes)}.\n"
+            f"Objetivo nutricional: alrededor de {kcal_rem} kcal y {prot_rem}g de proteínas.\n"
+            "Sugerí 3 opciones de recetas prácticas e indica ingredientes, instrucciones cortas y macros aproximados por porción.\n"
+            "Devuelve ÚNICAMENTE un array JSON válido con objetos del siguiente formato:\n"
+            "[\n"
+            "  {\n"
+            '    "titulo": "Nombre de la receta",\n'
+            '    "ingredientes": ["ingrediente 1", "ingrediente 2"],\n'
+            '    "instrucciones": "Paso 1... Paso 2...",\n'
+            '    "kcal": 400,\n'
+            '    "proteinas": 30,\n'
+            '    "carbos": 35,\n'
+            '    "grasas": 12\n'
+            "  }\n"
+            "]\n"
+            "Solo responde con el array JSON."
+        )
+        res = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw_text)
+        return jsonify({"status": "ok", "recetas": parsed})
+    except Exception as e:
+        print(f"[ERROR] API Fridge Recipes: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Ruta oculta donde Telegram manda los mensajes

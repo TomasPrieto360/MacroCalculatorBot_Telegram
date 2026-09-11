@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/svg+xml" href="/static/icon-192.svg">
     
-    <!-- Fuentes Google & Iconos -->
+    <!-- Fuentes Google & Iconos FontAwesome -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Telegram WebApp SDK -->
@@ -27,13 +27,16 @@
         <!-- Header Principal -->
         <header class="app-header">
             <div class="user-selector-container">
-                <i class="fa-solid fa-user-circle user-icon"></i>
+                <i class="fa-solid fa-user-astronaut user-icon"></i>
                 <select id="userSelect" class="user-select">
-                    <option value="default">Cargando usuarios...</option>
+                    <option value="default">Cargando perfil...</option>
                 </select>
             </div>
             <div class="header-actions">
-                <button id="btnRefresh" class="icon-btn" title="Actualizar"><i class="fa-solid fa-rotate-right"></i></button>
+                <div id="streakBadge" class="streak-pill" title="Racha de días cumplidos">
+                    <i class="fa-solid fa-fire text-orange"></i> <span id="streakCount">0</span>d
+                </div>
+                <button id="btnRefresh" class="icon-btn" title="Actualizar datos"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
         </header>
 
@@ -42,6 +45,7 @@
             
             <!-- PESTAÑA 1: INICIO (DASHBOARD) -->
             <section id="tab-dashboard" class="tab-page active">
+                
                 <!-- Tarjeta de Calorías Principal -->
                 <div class="card glass-card calorie-card">
                     <div class="calorie-ring-container">
@@ -70,7 +74,7 @@
 
                 <!-- Barras de Macros (Proteínas, Carbos, Grasas) -->
                 <div class="card glass-card macros-card">
-                    <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Distribución de Macros</h3>
+                    <h3 class="card-title"><i class="fa-solid fa-chart-pie text-cyan"></i> Distribución de Macros</h3>
                     
                     <div class="macro-bar-container">
                         <div class="macro-info">
@@ -84,8 +88,8 @@
 
                     <div class="macro-bar-container">
                         <div class="macro-info">
-                            <span class="macro-name"><i class="fa-solid fa-bread-slice text-green"></i> Carbohidratos</span>
-                            <span class="macro-val"><strong id="carbCurrent">0</strong>g</span>
+                            <span class="macro-name"><i class="fa-solid fa-wheat-awn text-green"></i> Carbohidratos</span>
+                            <span class="macro-val"><strong id="carbCurrent">0</strong> / <span id="carbGoal">250</span>g</span>
                         </div>
                         <div class="progress-track">
                             <div id="carbBar" class="progress-fill fill-green" style="width: 0%;"></div>
@@ -94,8 +98,8 @@
 
                     <div class="macro-bar-container">
                         <div class="macro-info">
-                            <span class="macro-name"><i class="fa-solid fa-avocado text-purple"></i> Grasas</span>
-                            <span class="macro-val"><strong id="fatCurrent">0</strong>g</span>
+                            <span class="macro-name"><i class="fa-solid fa-droplet text-purple"></i> Grasas</span>
+                            <span class="macro-val"><strong id="fatCurrent">0</strong> / <span id="fatGoal">65</span>g</span>
                         </div>
                         <div class="progress-track">
                             <div id="fatBar" class="progress-fill fill-purple" style="width: 0%;"></div>
@@ -103,19 +107,30 @@
                     </div>
                 </div>
 
+                <!-- Botón Destacado: Terminar Día -->
+                <div class="action-card-container">
+                    <button id="btnOpenCloseDay" class="btn btn-close-day">
+                        <i class="fa-solid fa-flag-checkered"></i> Terminar y Cerrar Día
+                    </button>
+                </div>
+
                 <!-- Accesos Rápidos -->
                 <div class="quick-actions-grid">
                     <button class="action-btn text-ai" onclick="switchTab('tab-ai')">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
-                        <span>IA / Foto</span>
+                        <i class="fa-solid fa-camera-retro"></i>
+                        <span>Escanear Foto</span>
                     </button>
                     <button class="action-btn text-search" onclick="switchTab('tab-search')">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <span>Buscar</span>
+                        <span>Buscar Comida</span>
                     </button>
-                    <button class="action-btn text-diary" onclick="switchTab('tab-diary')">
-                        <i class="fa-solid fa-list-check"></i>
-                        <span>Diario</span>
+                    <button class="action-btn text-fav" onclick="switchTab('tab-favorites')">
+                        <i class="fa-solid fa-star text-gold"></i>
+                        <span>Favoritos</span>
+                    </button>
+                    <button class="action-btn text-recipe" onclick="switchTab('tab-recipes')">
+                        <i class="fa-solid fa-utensils text-green"></i>
+                        <span>IA Heladera</span>
                     </button>
                 </div>
             </section>
@@ -123,39 +138,15 @@
             <!-- PESTAÑA 2: BUSCADOR & REGISTRO -->
             <section id="tab-search" class="tab-page">
                 <div class="card glass-card">
-                    <h3 class="card-title"><i class="fa-solid fa-magnifying-glass"></i> Registrar Alimento</h3>
+                    <h3 class="card-title"><i class="fa-solid fa-magnifying-glass text-orange"></i> Buscar o Registrar Alimento</h3>
                     <div class="search-box">
                         <i class="fa-solid fa-search search-icon"></i>
-                        <input type="text" id="searchInput" placeholder="Ej: Pollo, Manzana, 100g avena..." autocomplete="off">
+                        <input type="text" id="searchInput" placeholder="Ej: Pollo al horno, Manzana, 100g avena..." autocomplete="off">
                         <button id="btnClearSearch" class="clear-btn hidden"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                     
                     <div id="searchResults" class="search-results-list">
-                        <div class="placeholder-msg">Buscá un alimento de tu base de datos o escanealo.</div>
-                    </div>
-                </div>
-
-                <!-- Modal / Formulario de cantidad al seleccionar alimento -->
-                <div id="logModal" class="modal hidden">
-                    <div class="modal-content glass-card">
-                        <h3 id="modalFoodTitle" class="modal-title">Nombre Alimento</h3>
-                        <p id="modalFoodMacros" class="modal-subtitle">100g: 0 kcal | 0g P | 0g C | 0g G</p>
-                        
-                        <div class="form-group">
-                            <label for="logQuantity">Cantidad:</label>
-                            <div class="quantity-input-group">
-                                <input type="number" id="logQuantity" value="100" min="1" step="1">
-                                <select id="logUnit">
-                                    <option value="g">Gramos (g)</option>
-                                    <option value="u">Unidades (u)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="modal-actions">
-                            <button id="btnCancelLog" class="btn btn-secondary">Cancelar</button>
-                            <button id="btnConfirmLog" class="btn btn-primary">Registrar</button>
-                        </div>
+                        <div class="placeholder-msg">Escribí el nombre de un alimento para buscar en la base de datos o Open Food Facts.</div>
                     </div>
                 </div>
             </section>
@@ -163,57 +154,115 @@
             <!-- PESTAÑA 3: ASISTENTE IA & ESCÁNER DE FOTOS -->
             <section id="tab-ai" class="tab-page">
                 <div class="card glass-card">
-                    <h3 class="card-title"><i class="fa-solid fa-robot text-orange"></i> Asistente Nutricional IA</h3>
-                    <p class="card-desc">Describí tu plato o cargá una foto de una etiqueta nutricional y la IA calculará los macros automáticamente.</p>
+                    <h3 class="card-title"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i> Escáner IA con Foto</h3>
+                    <p class="card-desc">Subí una foto de tu **Plato de Comida** o de una **Etiqueta Nutricional**. Podés agregar detalles por texto para guiar a la IA.</p>
                     
                     <div class="ai-tabs">
-                        <button id="btnAiTextTab" class="ai-tab-btn active" onclick="switchAiMode('text')">
-                            <i class="fa-solid fa-pen-to-square"></i> Texto / Voz
+                        <button id="btnAiMealTab" class="ai-tab-btn active" onclick="switchAiMode('meal')">
+                            <i class="fa-solid fa-utensils"></i> Plato de Comida
                         </button>
-                        <button id="btnAiPhotoTab" class="ai-tab-btn" onclick="switchAiMode('photo')">
-                            <i class="fa-solid fa-camera"></i> Etiqueta / Foto
+                        <button id="btnAiLabelTab" class="ai-tab-btn" onclick="switchAiMode('label')">
+                            <i class="fa-solid fa-barcode"></i> Etiqueta
+                        </button>
+                        <button id="btnAiTextTab" class="ai-tab-btn" onclick="switchAiMode('text')">
+                            <i class="fa-solid fa-font"></i> Texto
+                        </button>
+                    </div>
+
+                    <!-- Modo Foto (Plato o Etiqueta) -->
+                    <div id="aiModePhoto" class="ai-mode-container">
+                        <div class="file-upload-zone" onclick="document.getElementById('aiPhotoInput').click()">
+                            <i class="fa-solid fa-camera upload-icon"></i>
+                            <p id="uploadText">Toca para abrir cámara o elegir foto</p>
+                            <input type="file" id="aiPhotoInput" accept="image/*" class="hidden">
+                        </div>
+
+                        <div id="imagePreviewContainer" class="hidden">
+                            <img id="imagePreview" src="" alt="Previsualización">
+                            <button id="btnRemoveImage" class="btn-icon-remove"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+
+                        <div class="form-group margin-top">
+                            <label for="aiPhotoDetails"><i class="fa-solid fa-pen-fancy"></i> Detalles adicionales (Opcional):</label>
+                            <textarea id="aiPhotoDetails" rows="2" placeholder="Ej: Es milanesa de pollo con puré de papas, cocinada al horno con aceite de oliva..."></textarea>
+                        </div>
+
+                        <button id="btnSubmitAiPhoto" class="btn btn-primary btn-block" disabled>
+                            <i class="fa-solid fa-sparkles"></i> Analizar Foto con IA
                         </button>
                     </div>
 
                     <!-- Modo Texto -->
-                    <div id="aiModeText" class="ai-mode-container">
-                        <textarea id="aiTextInput" placeholder="Ej: Me comí 2 milanesas de pollo con ensalada de tomate y lechuga"></textarea>
+                    <div id="aiModeText" class="ai-mode-container hidden">
+                        <div class="form-group">
+                            <label for="aiTextInput">Descripción de la comida:</label>
+                            <textarea id="aiTextInput" rows="3" placeholder="Ej: Me comí 2 huevos revueltos con 2 tostadas integrales y palta"></textarea>
+                        </div>
                         <button id="btnSubmitAiText" class="btn btn-primary btn-block">
-                            <i class="fa-solid fa-sparkles"></i> Analizar con IA
-                        </button>
-                    </div>
-
-                    <!-- Modo Foto -->
-                    <div id="aiModePhoto" class="ai-mode-container hidden">
-                        <div class="file-upload-zone" onclick="document.getElementById('aiPhotoInput').click()">
-                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                            <p id="uploadText">Toca para seleccionar foto de etiqueta</p>
-                            <input type="file" id="aiPhotoInput" accept="image/*" class="hidden">
-                        </div>
-                        <div id="imagePreviewContainer" class="hidden">
-                            <img id="imagePreview" src="" alt="Preview">
-                        </div>
-                        <button id="btnSubmitAiPhoto" class="btn btn-primary btn-block" disabled>
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Escanear Etiqueta
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Interpretar con IA
                         </button>
                     </div>
 
                     <!-- Resultado de la IA -->
                     <div id="aiResultBox" class="ai-result-card hidden">
-                        <h4 class="result-title"><i class="fa-solid fa-circle-check text-green"></i> Resultado IA</h4>
+                        <div class="result-header">
+                            <h4 class="result-title"><i class="fa-solid fa-sparkles text-green"></i> Resultado IA</h4>
+                            <span id="aiConfidenceBadge" class="badge badge-success">Confianza Alta</span>
+                        </div>
                         <div id="aiResultContent" class="result-body"></div>
-                        <button id="btnLogAiResult" class="btn btn-success btn-block margin-top">
-                            <i class="fa-solid fa-plus"></i> Agregar al Diario
-                        </button>
+                        <div class="result-actions">
+                            <button id="btnLogAiResult" class="btn btn-success flex-1">
+                                <i class="fa-solid fa-plus"></i> Registrar en el Día
+                            </button>
+                            <button id="btnSaveFavoriteAi" class="btn btn-outline flex-1">
+                                <i class="fa-solid fa-star text-gold"></i> Guardar Favorito
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- PESTAÑA 4: DIARIO (HISTORIAL) -->
+            <!-- PESTAÑA 4: RECETAS & IA DE HELADERA -->
+            <section id="tab-recipes" class="tab-page">
+                <div class="card glass-card">
+                    <h3 class="card-title"><i class="fa-solid fa-kitchen-set text-green"></i> Recetario IA de Heladera</h3>
+                    <p class="card-desc">Ingresá los ingredientes que tenés en casa y la IA te creará 3 recetas adaptadas a tus macros restantes.</p>
+
+                    <div class="form-group">
+                        <label for="fridgeIngredients">Ingredientes disponibles:</label>
+                        <input type="text" id="fridgeIngredients" placeholder="Ej: Huevos, atún, arroz, cebolla, palta">
+                    </div>
+
+                    <button id="btnGenerateFridgeRecipes" class="btn btn-primary btn-block">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generar 3 Recetas Recomendadas
+                    </button>
+
+                    <div id="fridgeRecipesContainer" class="recipes-grid margin-top">
+                        <div class="placeholder-msg">Escribí tus ingredientes para recibir ideas de cocina personalizadas.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 5: FAVORITOS -->
+            <section id="tab-favorites" class="tab-page">
+                <div class="card glass-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title"><i class="fa-solid fa-star text-gold"></i> Tus Comidas Favoritas</h3>
+                        <span id="favCountBadge" class="badge">0 ítems</span>
+                    </div>
+                    <p class="card-desc">Acceso rápido a los alimentos que consumís todos los días con 1 solo toque.</p>
+                    
+                    <div id="favoritesList" class="favorites-list">
+                        <div class="placeholder-msg">No tenés alimentos en favoritos aún. Guardá los que usés frecuentemente.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 6: DIARIO (HISTORIAL DE HOY) -->
             <section id="tab-diary" class="tab-page">
                 <div class="card glass-card">
                     <div class="card-header-flex">
-                        <h3 class="card-title"><i class="fa-solid fa-calendar-day"></i> Registros de Hoy</h3>
+                        <h3 class="card-title"><i class="fa-solid fa-calendar-day text-blue"></i> Comidas Registradas Hoy</h3>
                         <span id="historyCount" class="badge">0 comidas</span>
                     </div>
 
@@ -223,26 +272,70 @@
                 </div>
             </section>
 
-            <!-- PESTAÑA 5: PERFIL Y TDEE -->
+            <!-- PESTAÑA 7: PERFIL & CALCULADORA TDEE -->
             <section id="tab-profile" class="tab-page">
                 <div class="card glass-card">
-                    <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Calculadora TDEE y Metas</h3>
+                    <h3 class="card-title"><i class="fa-solid fa-calculator text-purple"></i> Calculadora TDEE y Perfil</h3>
+                    <p class="card-desc">Calculá tus necesidades calóricas exactas y distribución de macronutrientes según tu físico y objetivo.</p>
                     
-                    <form id="profileForm">
-                        <div class="form-group">
-                            <label for="profGoalKcal">Meta Calorías Diarias (kcal):</label>
-                            <input type="number" id="profGoalKcal" value="2000" min="1000" max="8000">
+                    <form id="tdeeForm">
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <label for="tdeePeso">Peso (kg):</label>
+                                <input type="number" id="tdeePeso" value="70" min="30" max="250" step="0.1" required>
+                            </div>
+                            <div class="form-group flex-1">
+                                <label for="tdeeAltura">Altura (cm):</label>
+                                <input type="number" id="tdeeAltura" value="170" min="100" max="230" required>
+                            </div>
                         </div>
-                        
+
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <label for="tdeeEdad">Edad (años):</label>
+                                <input type="number" id="tdeeEdad" value="25" min="12" max="100" required>
+                            </div>
+                            <div class="form-group flex-1">
+                                <label for="tdeeSexo">Sexo biológico:</label>
+                                <select id="tdeeSexo">
+                                    <option value="m">Masculino</option>
+                                    <option value="f">Femenino</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label for="profGoalProt">Meta Proteínas (g):</label>
-                            <input type="number" id="profGoalProt" value="160" min="30" max="400">
+                            <label for="tdeeActividad">Nivel de Actividad:</label>
+                            <select id="tdeeActividad">
+                                <option value="sedentario">Sedentario (Poco o ningún ejercicio)</option>
+                                <option value="ligero">Ligero (Ejercicio 1-3 días/semana)</option>
+                                <option value="moderado" selected>Moderado (Ejercicio 3-5 días/semana)</option>
+                                <option value="intenso">Intenso (Ejercicio 6-7 días/semana)</option>
+                                <option value="extremo">Extremo (Trabajo físico / Atleta)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tdeeObjetivo">Objetivo Nutricional:</label>
+                            <select id="tdeeObjetivo">
+                                <option value="perder">Déficit (Perder grasa)</option>
+                                <option value="mantener" selected>Mantenimiento (Mantener peso)</option>
+                                <option value="ganar">Superávit (Ganar masa muscular)</option>
+                            </select>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block">
-                            <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración
+                            <i class="fa-solid fa-arrows-rotate"></i> Calcular y Guardar Metas
                         </button>
                     </form>
+                </div>
+
+                <!-- Historial de Días Anteriores -->
+                <div class="card glass-card margin-top">
+                    <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left text-orange"></i> Historial de Días Anteriores</h3>
+                    <div id="pastDaysHistoryList" class="past-days-list">
+                        <div class="placeholder-msg">Cuando cierres un día con "Terminar Día", aparecerá guardado aquí.</div>
+                    </div>
                 </div>
             </section>
 
@@ -259,8 +352,8 @@
                 <span>Buscar</span>
             </button>
             <button class="nav-item nav-ai-btn" onclick="switchTab('tab-ai')">
-                <div class="ai-icon-circle"><i class="fa-solid fa-wand-sparkles"></i></div>
-                <span>IA</span>
+                <div class="ai-icon-circle"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <span>IA Scan</span>
             </button>
             <button class="nav-item" onclick="switchTab('tab-diary')">
                 <i class="fa-solid fa-book-open"></i>
@@ -271,6 +364,55 @@
                 <span>Perfil</span>
             </button>
         </nav>
+
+        <!-- MODAL 1: REGISTRAR ALIMENTO CON CANTIDAD -->
+        <div id="logModal" class="modal hidden">
+            <div class="modal-content glass-card">
+                <h3 id="modalFoodTitle" class="modal-title">Nombre Alimento</h3>
+                <p id="modalFoodMacros" class="modal-subtitle">100g: 0 kcal | 0g P | 0g C | 0g G</p>
+                
+                <div class="form-group margin-top">
+                    <label for="logQuantity">Ingresá la cantidad:</label>
+                    <div class="quantity-input-group">
+                        <input type="number" id="logQuantity" value="100" min="1" step="1">
+                        <select id="logUnit">
+                            <option value="g">Gramos (g)</option>
+                            <option value="u">Unidades (u)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="modalLivePreview" class="live-macro-preview">
+                    <!-- Vista previa dinámica de macros calculados -->
+                </div>
+
+                <div class="modal-actions">
+                    <button id="btnCancelLog" class="btn btn-secondary">Cancelar</button>
+                    <button id="btnConfirmLog" class="btn btn-primary">Registrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 2: TERMINAR Y CERRAR DÍA -->
+        <div id="closeDayModal" class="modal hidden">
+            <div class="modal-content glass-card text-center">
+                <div class="modal-icon-header">
+                    <i class="fa-solid fa-trophy text-gold"></i>
+                </div>
+                <h3 class="modal-title">¿Cerrar y Terminar el Día?</h3>
+                <p class="modal-subtitle">Se guardará el resumen de consumos en tu historial y se reiniciará el contador para mañana.</p>
+                
+                <div id="closeDaySummary" class="close-day-summary-box margin-top">
+                    <!-- Resumen del día se inserta vía JS -->
+                </div>
+
+                <div class="modal-actions margin-top">
+                    <button id="btnCancelCloseDay" class="btn btn-secondary flex-1">Volver</button>
+                    <button id="btnConfirmCloseDay" class="btn btn-success flex-1">¡Sí, Cerrar Día!</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Script Principal JS -->

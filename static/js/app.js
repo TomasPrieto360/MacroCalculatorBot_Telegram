@@ -1,10 +1,11 @@
-// MacroBot Mobile App Logic
+// MacroBot Mobile PWA App Logic - Standalone
 let currentUser = 'default';
 let currentUserData = null;
 let selectedFoodForLog = null;
 let currentAiParsedFood = null;
+let currentAiMode = 'meal'; // 'meal', 'label', 'text'
 
-// Inicialización de Telegram WebApp
+// Inicialización de Telegram WebApp SDK (opcional si corre dentro de Telegram)
 const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.ready();
@@ -22,9 +23,8 @@ async function initApp() {
     
     // Auto-detectar usuario de Telegram si está disponible
     if (tg?.initDataUnsafe?.user?.id) {
-        const tgId = str(tg.initDataUnsafe.user.id);
+        const tgId = String(tg.initDataUnsafe.user.id);
         const userSelect = document.getElementById('userSelect');
-        // Agregar si no existe
         if (![...userSelect.options].some(opt => opt.value === tgId)) {
             const newOpt = document.createElement('option');
             newOpt.value = tgId;
@@ -38,7 +38,7 @@ async function initApp() {
     await loadUserData();
 }
 
-// Cargar lista de usuarios desde la API
+// Cargar usuarios
 async function loadUsers() {
     try {
         const res = await fetch('/api/users');
@@ -47,7 +47,7 @@ async function loadUsers() {
         userSelect.innerHTML = '';
 
         if (users.length === 0) {
-            userSelect.innerHTML = '<option value="invitado">Invitado</option>';
+            userSelect.innerHTML = '<option value="defecto">Usuario Principal</option>';
         } else {
             users.forEach(u => {
                 const opt = document.createElement('option');
@@ -56,14 +56,16 @@ async function loadUsers() {
                 userSelect.appendChild(opt);
             });
         }
-
-        currentUser = userSelect.value;
+        currentUser = userSelect.value || 'defecto';
     } catch (e) {
         console.error('Error cargando usuarios:', e);
+        const userSelect = document.getElementById('userSelect');
+        userSelect.innerHTML = '<option value="defecto">Usuario Principal</option>';
+        currentUser = 'defecto';
     }
 }
 
-// Cargar datos completos del usuario activo
+// Cargar datos de usuario activo
 async function loadUserData() {
     if (!currentUser) return;
     try {
@@ -71,16 +73,22 @@ async function loadUserData() {
         currentUserData = await res.json();
         renderDashboard();
         renderHistory();
+        renderFavorites();
         renderProfile();
+        renderPastDaysHistory();
     } catch (e) {
         console.error('Error cargando datos de usuario:', e);
     }
 }
 
-// Renderizar Anillo y Barras de Macros
+// Renderizar Dashboard Principal
 function renderDashboard() {
     if (!currentUserData) return;
 
+    // Racha
+    document.getElementById('streakCount').textContent = currentUserData.racha_dias || 0;
+
+    // Calorías
     const kcalConsumed = currentUserData.kcal || 0;
     const kcalGoal = currentUserData.meta_kcal || 2000;
     const kcalRemaining = Math.max(0, kcalGoal - kcalConsumed);
@@ -89,13 +97,13 @@ function renderDashboard() {
     document.getElementById('kcalGoal').textContent = Math.round(kcalGoal);
     document.getElementById('kcalRemaining').textContent = Math.round(kcalRemaining);
 
-    // Actualizar progreso del Anillo SVG (Radio = 70, Perímetro = 440)
+    // Anillo SVG (Radio 70 -> Perímetro 440)
     const ringFill = document.getElementById('calorieProgress');
     const percent = Math.min(100, (kcalConsumed / kcalGoal) * 100);
     const offset = 440 - (440 * percent) / 100;
     ringFill.style.strokeDashoffset = offset;
 
-    // Macros
+    // Macros (Proteínas, Carbos, Grasas)
     const protCurrent = currentUserData.proteinas || 0;
     const protGoal = currentUserData.meta_proteinas || 160;
     document.getElementById('protCurrent').textContent = protCurrent.toFixed(1);
@@ -103,15 +111,19 @@ function renderDashboard() {
     document.getElementById('protBar').style.width = `${Math.min(100, (protCurrent / protGoal) * 100)}%`;
 
     const carbCurrent = currentUserData.carbos || 0;
+    const carbGoal = currentUserData.meta_carbos || 250;
     document.getElementById('carbCurrent').textContent = carbCurrent.toFixed(1);
-    document.getElementById('carbBar').style.width = `${Math.min(100, (carbCurrent / 250) * 100)}%`;
+    document.getElementById('carbGoal').textContent = carbGoal;
+    document.getElementById('carbBar').style.width = `${Math.min(100, (carbCurrent / carbGoal) * 100)}%`;
 
     const fatCurrent = currentUserData.grasas || 0;
+    const fatGoal = currentUserData.meta_grasas || 65;
     document.getElementById('fatCurrent').textContent = fatCurrent.toFixed(1);
-    document.getElementById('fatBar').style.width = `${Math.min(100, (fatCurrent / 70) * 100)}%`;
+    document.getElementById('fatGoal').textContent = fatGoal;
+    document.getElementById('fatBar').style.width = `${Math.min(100, (fatCurrent / fatGoal) * 100)}%`;
 }
 
-// Renderizar Historial
+// Renderizar Historial de Hoy
 function renderHistory() {
     const list = document.getElementById('historyList');
     const countBadge = document.getElementById('historyCount');
@@ -127,11 +139,11 @@ function renderHistory() {
     list.innerHTML = history.map(item => `
         <div class="history-item">
             <div class="history-item-left">
-                <h4>${item.alimento}</h4>
-                <p>${item.cantidad_str} • P: ${item.proteinas.toFixed(1)}g | C: ${item.carbos.toFixed(1)}g | G: ${item.grasas.toFixed(1)}g</p>
+                <h4 style="text-transform: capitalize;">${item.alimento}</h4>
+                <p>${item.cantidad_str} • P: ${(item.proteinas||0).toFixed(1)}g | C: ${(item.carbos||0).toFixed(1)}g | G: ${(item.grasas||0).toFixed(1)}g</p>
             </div>
-            <div class="history-item-right">
-                <span class="history-kcal">${Math.round(item.kcal)} kcal</span>
+            <div class="history-item-right" style="display:flex; align-items:center; gap:10px;">
+                <span class="history-kcal" style="font-weight:700; color:var(--color-orange);">${Math.round(item.kcal)} kcal</span>
                 <button class="delete-item-btn" onclick="deleteHistoryItem('${item.id}')" title="Eliminar">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
@@ -140,16 +152,78 @@ function renderHistory() {
     `).join('');
 }
 
-// Renderizar formulario de Perfil
-function renderProfile() {
-    if (!currentUserData) return;
-    document.getElementById('profGoalKcal').value = currentUserData.meta_kcal || 2000;
-    document.getElementById('profGoalProt').value = currentUserData.meta_proteinas || 160;
+// Renderizar Favoritos
+function renderFavorites() {
+    const list = document.getElementById('favoritesList');
+    const badge = document.getElementById('favCountBadge');
+    const favs = currentUserData?.favoritos || {};
+    const keys = Object.keys(favs);
+
+    badge.textContent = `${keys.length} ítems`;
+
+    if (keys.length === 0) {
+        list.innerHTML = '<div class="placeholder-msg">No tenés alimentos en favoritos aún. Guardá los que usés frecuentemente.</div>';
+        return;
+    }
+
+    list.innerHTML = keys.map(k => {
+        const item = favs[k];
+        return `
+            <div class="fav-item-card">
+                <div class="food-item-info" onclick='logFavoriteItem(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+                    <h4 style="text-transform: capitalize;"><i class="fa-solid fa-star text-gold"></i> ${item.nombre}</h4>
+                    <p>${Math.round(item.kcal)} kcal | P: ${item.proteinas}g | C: ${item.carbos}g | G: ${item.grasas}g</p>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-primary" style="padding:6px 12px; font-size:0.8rem;" onclick='logFavoriteItem(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+                        <i class="fa-solid fa-plus"></i> Usar
+                    </button>
+                    <button class="delete-item-btn" onclick="deleteFavoriteItem('${item.nombre}')" title="Eliminar de favoritos">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
-// Event Listeners generales
+// Renderizar Perfil & TDEE
+function renderProfile() {
+    if (!currentUserData) return;
+    const perfil = currentUserData.perfil_fisico || {};
+    if (perfil.peso) document.getElementById('tdeePeso').value = perfil.peso;
+    if (perfil.altura) document.getElementById('tdeeAltura').value = perfil.altura;
+    if (perfil.edad) document.getElementById('tdeeEdad').value = perfil.edad;
+    if (perfil.sexo) document.getElementById('tdeeSexo').value = perfil.sexo;
+    if (perfil.actividad) document.getElementById('tdeeActividad').value = perfil.actividad;
+    if (perfil.objetivo) document.getElementById('tdeeObjetivo').value = perfil.objetivo;
+}
+
+// Renderizar Historial de Días Anteriores
+function renderPastDaysHistory() {
+    const list = document.getElementById('pastDaysHistoryList');
+    const pastDays = currentUserData?.historial_dias || [];
+
+    if (pastDays.length === 0) {
+        list.innerHTML = '<div class="placeholder-msg">Cuando cierres un día con "Terminar Día", aparecerá guardado aquí.</div>';
+        return;
+    }
+
+    list.innerHTML = pastDays.map(day => `
+        <div class="fav-item-card">
+            <div class="food-item-info">
+                <h4><i class="fa-solid fa-calendar-check text-blue"></i> ${day.fecha}</h4>
+                <p>Consumo: <strong>${Math.round(day.kcal)}</strong> / ${Math.round(day.meta_kcal)} kcal • ${day.comidas_count} comidas</p>
+                <p style="font-size:0.75rem; color:var(--text-secondary);">P: ${day.proteinas}g | C: ${day.carbos}g | G: ${day.grasas}g</p>
+            </div>
+            <span class="badge ${day.cumplido ? 'badge-success' : ''}">${day.cumplido ? '✅ Meta Cumplida' : '📊 Cerrado'}</span>
+        </div>
+    `).join('');
+}
+
+// Setup Event Listeners
 function setupEventListeners() {
-    // Selector de Usuario
+    // Selector Usuario
     document.getElementById('userSelect').addEventListener('change', (e) => {
         currentUser = e.target.value;
         loadUserData();
@@ -158,7 +232,7 @@ function setupEventListeners() {
     // Refresh
     document.getElementById('btnRefresh').addEventListener('click', loadUserData);
 
-    // Búsqueda con Debounce
+    // Búsqueda
     let searchTimeout;
     const searchInput = document.getElementById('searchInput');
     const clearBtn = document.getElementById('btnClearSearch');
@@ -166,70 +240,90 @@ function setupEventListeners() {
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.trim();
         clearBtn.classList.toggle('hidden', query.length === 0);
-        
         clearTimeout(searchTimeout);
         if (query.length < 2) {
-            document.getElementById('searchResults').innerHTML = '<div class="placeholder-msg">Buscá un alimento de tu base de datos o escanealo.</div>';
+            document.getElementById('searchResults').innerHTML = '<div class="placeholder-msg">Escribí el nombre de un alimento para buscar.</div>';
             return;
         }
-
         searchTimeout = setTimeout(() => performSearch(query), 300);
     });
 
     clearBtn.addEventListener('click', () => {
         searchInput.value = '';
         clearBtn.classList.add('hidden');
-        document.getElementById('searchResults').innerHTML = '<div class="placeholder-msg">Buscá un alimento de tu base de datos o escanealo.</div>';
+        document.getElementById('searchResults').innerHTML = '<div class="placeholder-msg">Escribí el nombre de un alimento para buscar.</div>';
     });
 
-    // Modal de registro
+    // Modales
     document.getElementById('btnCancelLog').addEventListener('click', closeLogModal);
     document.getElementById('btnConfirmLog').addEventListener('click', confirmLogFood);
+    document.getElementById('logQuantity').addEventListener('input', updateLivePreview);
+    document.getElementById('logUnit').addEventListener('change', updateLivePreview);
 
-    // Formularios IA
-    document.getElementById('btnSubmitAiText').addEventListener('click', submitAiText);
+    // Botón Cerrar Día
+    document.getElementById('btnOpenCloseDay').addEventListener('click', openCloseDayModal);
+    document.getElementById('btnCancelCloseDay').addEventListener('click', closeCloseDayModal);
+    document.getElementById('btnConfirmCloseDay').addEventListener('click', confirmCloseDay);
+
+    // IA / Foto
     document.getElementById('aiPhotoInput').addEventListener('change', handleImageSelect);
+    document.getElementById('btnRemoveImage').addEventListener('click', resetPhotoUpload);
     document.getElementById('btnSubmitAiPhoto').addEventListener('click', submitAiPhoto);
+    document.getElementById('btnSubmitAiText').addEventListener('click', submitAiText);
     document.getElementById('btnLogAiResult').addEventListener('click', logAiResult);
+    document.getElementById('btnSaveFavoriteAi').addEventListener('click', saveFavoriteFromAi);
 
-    // Guardar Perfil
-    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    // Recetas Heladera
+    document.getElementById('btnGenerateFridgeRecipes').addEventListener('click', generateFridgeRecipes);
+
+    // Formulario TDEE
+    document.getElementById('tdeeForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const meta_kcal = parseFloat(document.getElementById('profGoalKcal').value);
-        const meta_proteinas = parseFloat(document.getElementById('profGoalProt').value);
+        const peso = parseFloat(document.getElementById('tdeePeso').value);
+        const altura = parseFloat(document.getElementById('tdeeAltura').value);
+        const edad = parseFloat(document.getElementById('tdeeEdad').value);
+        const sexo = document.getElementById('tdeeSexo').value;
+        const actividad = document.getElementById('tdeeActividad').value;
+        const objetivo = document.getElementById('tdeeObjetivo').value;
 
-        await fetch(`/api/user/${currentUser}/profile`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ meta_kcal, meta_proteinas })
-        });
-
-        alert('¡Configuración guardada!');
-        await loadUserData();
+        try {
+            const res = await fetch(`/api/user/${currentUser}/calculate-tdee`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ peso, altura, edad, sexo, actividad, objetivo })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert(`¡Metas recalculadas!\nMeta Calorías: ${data.meta_kcal} kcal\nProteínas: ${data.meta_proteinas}g`);
+                await loadUserData();
+            }
+        } catch (e) {
+            alert('Error calculando TDEE');
+        }
     });
 }
 
 // Búsqueda en API
 async function performSearch(query) {
     const resultsContainer = document.getElementById('searchResults');
-    resultsContainer.innerHTML = '<div class="placeholder-msg"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</div>';
+    resultsContainer.innerHTML = '<div class="placeholder-msg"><i class="fa-solid fa-spinner fa-spin"></i> Buscando alimentos...</div>';
 
     try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         const items = await res.json();
 
         if (items.length === 0) {
-            resultsContainer.innerHTML = '<div class="placeholder-msg">No se encontraron alimentos.</div>';
+            resultsContainer.innerHTML = '<div class="placeholder-msg">No se encontraron alimentos en la base de datos.</div>';
             return;
         }
 
         resultsContainer.innerHTML = items.map(item => `
             <div class="food-item-card" onclick='openLogModal(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
                 <div class="food-item-info">
-                    <h4>${item.alimento}</h4>
+                    <h4 style="text-transform: capitalize;">${item.alimento}</h4>
                     <p>100g: ${Math.round(item.kcal)} kcal | P: ${item.proteinas}g | C: ${item.carbos}g | G: ${item.grasas}g</p>
                 </div>
-                <i class="fa-solid fa-plus text-orange"></i>
+                <i class="fa-solid fa-circle-plus text-orange" style="font-size:1.3rem;"></i>
             </div>
         `).join('');
     } catch (e) {
@@ -244,7 +338,29 @@ function openLogModal(food) {
     document.getElementById('modalFoodMacros').textContent = 
         `100g: ${Math.round(food.kcal)} kcal | P: ${food.proteinas}g | C: ${food.carbos}g | G: ${food.grasas}g`;
     document.getElementById('logQuantity').value = 100;
+    updateLivePreview();
     document.getElementById('logModal').classList.remove('hidden');
+}
+
+function updateLivePreview() {
+    if (!selectedFoodForLog) return;
+    const qty = parseFloat(document.getElementById('logQuantity').value) || 100;
+    const unit = document.getElementById('logUnit').value;
+
+    let grams = qty;
+    if (unit === 'u' && selectedFoodForLog.peso_unidad) {
+        grams = qty * selectedFoodForLog.peso_unidad;
+    }
+
+    const kcal = ((selectedFoodForLog.kcal || 0) * grams) / 100;
+    const prot = ((selectedFoodForLog.proteinas || 0) * grams) / 100;
+    const carb = ((selectedFoodForLog.carbos || 0) * grams) / 100;
+    const fat = ((selectedFoodForLog.grasas || 0) * grams) / 100;
+
+    document.getElementById('modalLivePreview').innerHTML = `
+        ⚡ Total a registrar: <strong>${Math.round(kcal)} kcal</strong><br>
+        🥩 Proteínas: <strong>${prot.toFixed(1)}g</strong> | 🌾 Carbos: <strong>${carb.toFixed(1)}g</strong> | 🥑 Grasas: <strong>${fat.toFixed(1)}g</strong>
+    `;
 }
 
 function closeLogModal() {
@@ -278,48 +394,51 @@ async function confirmLogFood() {
     }
 }
 
-// Eliminar Registro Historial
-async function deleteHistoryItem(itemId) {
-    if (!confirm('¿Eliminar esta comida del registro?')) return;
-    try {
-        await fetch(`/api/user/${currentUser}/history/${itemId}`, { method: 'DELETE' });
-        await loadUserData();
-    } catch (e) {
-        alert('Error al eliminar');
-    }
+// Modal Cerrar Día
+function openCloseDayModal() {
+    if (!currentUserData) return;
+    const consumedKcal = Math.round(currentUserData.kcal || 0);
+    const goalKcal = Math.round(currentUserData.meta_kcal || 2000);
+    const comidasCount = (currentUserData.historial_hoy || []).length;
+
+    document.getElementById('closeDaySummary').innerHTML = `
+        <div style="font-size:1.1rem; font-weight:700; margin-bottom:6px;">Total consumido hoy: <span class="text-orange">${consumedKcal} kcal</span> / ${goalKcal} kcal</div>
+        <div style="font-size:0.88rem; color:var(--text-secondary);">Proteínas: ${(currentUserData.proteinas||0).toFixed(1)}g | Carbos: ${(currentUserData.carbos||0).toFixed(1)}g | Grasas: ${(currentUserData.grasas||0).toFixed(1)}g</div>
+        <div style="font-size:0.85rem; margin-top:6px; color:var(--text-muted);">${comidasCount} comidas registradas en la jornada.</div>
+    `;
+    document.getElementById('closeDayModal').classList.remove('hidden');
 }
 
-// IA - Texto
-async function submitAiText() {
-    const text = document.getElementById('aiTextInput').value.trim();
-    if (!text) return alert('Escribí algo para analizar.');
+function closeCloseDayModal() {
+    document.getElementById('closeDayModal').classList.add('hidden');
+}
 
-    const btn = document.getElementById('btnSubmitAiText');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando...';
-
+async function confirmCloseDay() {
     try {
-        const res = await fetch('/api/ai/parse-food', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ text })
-        });
+        const res = await fetch(`/api/user/${currentUser}/close-day`, { method: 'POST' });
         const data = await res.json();
-        
+        closeCloseDayModal();
         if (data.status === 'ok') {
-            displayAiResult(data.parsed);
-        } else {
-            alert(data.message || 'No se pudo interpretar');
+            alert(`🎉 ¡Día Cerrado!\nTu nueva racha es de ${data.racha_dias} día(s).`);
+            await loadUserData();
+            switchTab('tab-dashboard');
         }
     } catch (e) {
-        alert('Error consultando la IA');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-sparkles"></i> Analizar con IA';
+        alert('Error cerrando el día');
     }
 }
 
-// IA - Foto
+// IA - Selección de Modo
+function switchAiMode(mode) {
+    currentAiMode = mode;
+    document.getElementById('btnAiMealTab').classList.toggle('active', mode === 'meal');
+    document.getElementById('btnAiLabelTab').classList.toggle('active', mode === 'label');
+    document.getElementById('btnAiTextTab').classList.toggle('active', mode === 'text');
+
+    document.getElementById('aiModePhoto').classList.toggle('hidden', mode === 'text');
+    document.getElementById('aiModeText').classList.toggle('hidden', mode !== 'text');
+}
+
 function handleImageSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -334,50 +453,104 @@ function handleImageSelect(e) {
     reader.readAsDataURL(file);
 }
 
+function resetPhotoUpload() {
+    document.getElementById('aiPhotoInput').value = '';
+    document.getElementById('imagePreview').src = '';
+    document.getElementById('imagePreviewContainer').classList.add('hidden');
+    document.getElementById('uploadText').textContent = 'Toca para abrir cámara o elegir foto';
+    document.getElementById('btnSubmitAiPhoto').disabled = true;
+}
+
+// IA - Submit Foto (Plato o Etiqueta)
 async function submitAiPhoto() {
     const imgSrc = document.getElementById('imagePreview').src;
     if (!imgSrc) return;
 
+    const details = document.getElementById('aiPhotoDetails').value.trim();
     const btn = document.getElementById('btnSubmitAiPhoto');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando Foto...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando con Vision AI...';
+
+    const endpoint = currentAiMode === 'label' ? '/api/ai/scan-label' : '/api/ai/scan-meal-photo';
 
     try {
-        const base64Data = imgSrc.split(',')[1];
-        const res = await fetch('/api/ai/scan-label', {
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ image_base64: base64Data })
+            body: JSON.stringify({
+                image_base64: imgSrc,
+                text_hint: details
+            })
         });
         const data = await res.json();
-
         if (data.status === 'ok') {
             displayAiResult(data.parsed);
         } else {
-            alert(data.message || 'No se pudo escanear la etiqueta');
+            alert(data.message || 'No se pudo analizar la foto');
         }
     } catch (e) {
-        alert('Error en escáner de foto');
+        alert('Error conectando con la IA de visión');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Escanear Etiqueta';
+        btn.innerHTML = '<i class="fa-solid fa-sparkles"></i> Analizar Foto con IA';
     }
 }
 
+// IA - Submit Texto
+async function submitAiText() {
+    const text = document.getElementById('aiTextInput').value.trim();
+    if (!text) return alert('Escribí una descripción.');
+
+    const btn = document.getElementById('btnSubmitAiText');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Interpretando...';
+
+    try {
+        const res = await fetch('/api/ai/parse-food', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            displayAiResult(data.parsed);
+        } else {
+            alert(data.message || 'No se pudo interpretar el texto');
+        }
+    } catch (e) {
+        alert('Error consultando la IA');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Interpretar con IA';
+    }
+}
+
+// Mostrar Resultado IA
 function displayAiResult(parsed) {
     currentAiParsedFood = parsed;
     const box = document.getElementById('aiResultBox');
     const content = document.getElementById('aiResultContent');
+    const badge = document.getElementById('aiConfidenceBadge');
+
+    if (parsed.confianza) {
+        badge.textContent = `Confianza: ${parsed.confianza}`;
+    } else {
+        badge.textContent = 'Interpretación IA';
+    }
 
     content.innerHTML = `
-        <strong>${parsed.alimento || 'Alimento'}</strong><br>
-        🔥 Calorías: ${Math.round(parsed.kcal || 0)} kcal<br>
-        🥩 Proteínas: ${(parsed.proteinas || 0).toFixed(1)}g | 🍞 Carbos: ${(parsed.carbos || 0).toFixed(1)}g | 🥑 Grasas: ${(parsed.grasas || 0).toFixed(1)}g
+        <h3 style="font-size:1.1rem; color:var(--text-primary); text-transform:capitalize; margin-bottom:4px;">${parsed.alimento || 'Plato analizado'}</h3>
+        ${parsed.cantidad_estimada_g ? `<p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:8px;">Porción estimada: <strong>${parsed.cantidad_estimada_g}g</strong></p>` : ''}
+        <div style="background:rgba(15,23,42,0.6); padding:10px; border-radius:10px; font-size:0.9rem;">
+            🔥 Calorías: <strong class="text-orange">${Math.round(parsed.kcal || 0)} kcal</strong><br>
+            🥩 Proteínas: <strong>${(parsed.proteinas || 0).toFixed(1)}g</strong> | 🌾 Carbos: <strong>${(parsed.carbos || 0).toFixed(1)}g</strong> | 🥑 Grasas: <strong>${(parsed.grasas || 0).toFixed(1)}g</strong>
+        </div>
     `;
 
     box.classList.remove('hidden');
 }
 
+// Registrar resultado IA al día
 async function logAiResult() {
     if (!currentAiParsedFood) return;
     try {
@@ -386,7 +559,7 @@ async function logAiResult() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 alimento: currentAiParsedFood.alimento || 'Comida IA',
-                cantidad: 100,
+                cantidad: currentAiParsedFood.cantidad_estimada_g || 100,
                 unidad: 'g',
                 stats: currentAiParsedFood
             })
@@ -401,28 +574,127 @@ async function logAiResult() {
     }
 }
 
-// Navegación por pestañas
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-page').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-
-    document.getElementById(tabId).classList.add('active');
-    const navIndex = ['tab-dashboard', 'tab-search', 'tab-ai', 'tab-diary', 'tab-profile'].indexOf(tabId);
-    if (navIndex !== -1) {
-        document.querySelectorAll('.bottom-nav .nav-item')[navIndex].classList.add('active');
+// Guardar resultado IA como favorito
+async function saveFavoriteFromAi() {
+    if (!currentAiParsedFood) return;
+    try {
+        await fetch(`/api/user/${currentUser}/favorites`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                nombre: currentAiParsedFood.alimento || 'Favorito IA',
+                kcal: currentAiParsedFood.kcal || 0,
+                proteinas: currentAiParsedFood.proteinas || 0,
+                carbos: currentAiParsedFood.carbos || 0,
+                grasas: currentAiParsedFood.grasas || 0
+            })
+        });
+        alert('¡Guardado en favoritos!');
+        await loadUserData();
+    } catch (e) {
+        alert('Error al guardar en favoritos');
     }
 }
 
-function switchAiMode(mode) {
-    document.getElementById('btnAiTextTab').classList.toggle('active', mode === 'text');
-    document.getElementById('btnAiPhotoTab').classList.toggle('active', mode === 'photo');
-    document.getElementById('aiModeText').classList.toggle('hidden', mode !== 'text');
-    document.getElementById('aiModePhoto').classList.toggle('hidden', mode !== 'photo');
+// Log Favorito
+async function logFavoriteItem(item) {
+    openLogModal({
+        alimento: item.nombre,
+        kcal: item.kcal,
+        proteinas: item.proteinas,
+        carbos: item.carbos,
+        grasas: item.grasas
+    });
 }
 
-// Registrar Service Worker PWA
+// Borrar Favorito
+async function deleteFavoriteItem(nombre) {
+    if (!confirm(`¿Eliminar "${nombre}" de favoritos?`)) return;
+    try {
+        await fetch(`/api/user/${currentUser}/favorites?nombre=${encodeURIComponent(nombre)}`, { method: 'DELETE' });
+        await loadUserData();
+    } catch (e) {
+        alert('Error borrando favorito');
+    }
+}
+
+// Recetas IA Heladera
+async function generateFridgeRecipes() {
+    const rawIngs = document.getElementById('fridgeIngredients').value.trim();
+    if (!rawIngs) return alert('Ingresá al menos 1 o 2 ingredientes.');
+
+    const ings = rawIngs.split(',').map(i => i.trim()).filter(Boolean);
+    const container = document.getElementById('fridgeRecipesContainer');
+    container.innerHTML = '<div class="placeholder-msg"><i class="fa-solid fa-spinner fa-spin text-green"></i> La IA está creando tus 3 recetas personalizadas...</div>';
+
+    const kcalRem = currentUserData ? Math.max(200, currentUserData.meta_kcal - currentUserData.kcal) : 600;
+    const protRem = currentUserData ? Math.max(10, currentUserData.meta_proteinas - currentUserData.proteinas) : 35;
+
+    try {
+        const res = await fetch('/api/ai/fridge-recipes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ingredientes: ings, kcal_rem: kcalRem, prot_rem: protRem })
+        });
+        const data = await res.json();
+
+        if (data.status === 'ok' && Array.isArray(data.recetas)) {
+            container.innerHTML = data.recetas.map(rec => `
+                <div class="recipe-item-card" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                        <h4 style="color:var(--color-green); font-size:1rem;"><i class="fa-solid fa-utensils"></i> ${rec.titulo}</h4>
+                        <span class="badge" style="color:var(--color-orange);">${Math.round(rec.kcal)} kcal</span>
+                    </div>
+                    <p style="font-size:0.82rem; color:var(--text-secondary);"><strong>Ingredientes:</strong> ${Array.isArray(rec.ingredientes) ? rec.ingredientes.join(', ') : rec.ingredientes}</p>
+                    <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">${rec.instrucciones}</p>
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center; margin-top:6px; border-top:1px dashed var(--bg-card-border); padding-top:6px;">
+                        <span style="font-size:0.8rem; color:var(--text-secondary);">P: ${rec.proteinas}g | C: ${rec.carbos}g | G: ${rec.grasas}g</span>
+                        <button class="btn btn-success" style="padding:6px 12px; font-size:0.8rem;" onclick='openLogModal(${JSON.stringify({alimento: rec.titulo, kcal: rec.kcal, proteinas: rec.proteinas, carbos: rec.carbos, grasas: rec.grasas}).replace(/'/g, "&apos;")})'>
+                            <i class="fa-solid fa-plus"></i> Usar Receta
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="placeholder-msg">No se pudieron generar recetas en este momento.</div>';
+        }
+    } catch (e) {
+        container.innerHTML = '<div class="placeholder-msg">Error de conexión con la IA de cocina.</div>';
+    }
+}
+
+// Eliminar Registro Historial Hoy
+async function deleteHistoryItem(itemId) {
+    if (!confirm('¿Eliminar esta comida del registro de hoy?')) return;
+    try {
+        await fetch(`/api/user/${currentUser}/history/${itemId}`, { method: 'DELETE' });
+        await loadUserData();
+    } catch (e) {
+        alert('Error al eliminar');
+    }
+}
+
+// Navegación Pestañas
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-page').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+
+    const targetTab = document.getElementById(tabId);
+    if (targetTab) targetTab.classList.add('active');
+
+    const tabOrder = ['tab-dashboard', 'tab-search', 'tab-ai', 'tab-diary', 'tab-profile'];
+    const navIndex = tabOrder.indexOf(tabId);
+    if (navIndex !== -1) {
+        const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+        if (navItems[navIndex]) navItems[navIndex].classList.add('active');
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Registrar Service Worker
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').catch(err => console.log('SW Error:', err));
+        navigator.serviceWorker.register('/static/sw.js').catch(err => console.log('SW Note:', err));
     }
 }
