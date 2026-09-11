@@ -3,6 +3,8 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 import json
 import os
 import sys
+from datetime import datetime
+import time
 from dotenv import load_dotenv
 import difflib
 from google import genai
@@ -1981,55 +1983,60 @@ def api_calculate_tdee(user_id):
 # Endpoint API: Terminar Día (Cerrar día, guardar historial y resetear)
 @app.route('/api/user/<user_id>/close-day', methods=['POST'])
 def api_close_day(user_id):
-    u_data = datos_usuarios[user_id]
-    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
-    
-    consumed_kcal = round(u_data.get("kcal", 0), 1)
-    consumed_prot = round(u_data.get("proteinas", 0), 1)
-    consumed_carb = round(u_data.get("carbos", 0), 1)
-    consumed_gras = round(u_data.get("grasas", 0), 1)
-    meta_k = u_data.get("meta_kcal", 2000)
-    
-    # Evaluar si cumplió la meta (dentro de +-15% de margen)
-    cumplido = abs(consumed_kcal - meta_k) <= (meta_k * 0.15) or (consumed_kcal >= meta_k * 0.85 and consumed_kcal <= meta_k * 1.15)
-    
-    racha = u_data.get("racha_dias", 0)
-    if cumplido:
-        racha += 1
-    else:
-        racha = 0
-    u_data["racha_dias"] = racha
+    try:
+        from datetime import datetime
+        u_data = datos_usuarios[user_id]
+        fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+        
+        consumed_kcal = round(u_data.get("kcal", 0), 1)
+        consumed_prot = round(u_data.get("proteinas", 0), 1)
+        consumed_carb = round(u_data.get("carbos", 0), 1)
+        consumed_gras = round(u_data.get("grasas", 0), 1)
+        meta_k = u_data.get("meta_kcal", 2000)
+        
+        # Evaluar si cumplió la meta (dentro de +-15% de margen)
+        cumplido = abs(consumed_kcal - meta_k) <= (meta_k * 0.15) or (consumed_kcal >= meta_k * 0.85 and consumed_kcal <= meta_k * 1.15)
+        
+        racha = u_data.get("racha_dias", 0)
+        if cumplido:
+            racha += 1
+        else:
+            racha = 0
+        u_data["racha_dias"] = racha
 
-    registro_dia = {
-        "fecha": fecha_hoy,
-        "kcal": consumed_kcal,
-        "proteinas": consumed_prot,
-        "carbos": consumed_carb,
-        "grasas": consumed_gras,
-        "meta_kcal": meta_k,
-        "comidas_count": len(u_data.get("historial_hoy", [])),
-        "cumplido": cumplido
-    }
-    
-    if "historial_dias" not in u_data:
-        u_data["historial_dias"] = []
-    u_data["historial_dias"].insert(0, registro_dia)
-    # Limitar historial guardado a 90 días
-    u_data["historial_dias"] = u_data["historial_dias"][:90]
+        registro_dia = {
+            "fecha": fecha_hoy,
+            "kcal": consumed_kcal,
+            "proteinas": consumed_prot,
+            "carbos": consumed_carb,
+            "grasas": consumed_gras,
+            "meta_kcal": meta_k,
+            "comidas_count": len(u_data.get("historial_hoy", [])),
+            "cumplido": cumplido
+        }
+        
+        if "historial_dias" not in u_data:
+            u_data["historial_dias"] = []
+        u_data["historial_dias"].insert(0, registro_dia)
+        # Limitar historial guardado a 90 días
+        u_data["historial_dias"] = u_data["historial_dias"][:90]
 
-    # Resetear día actual
-    u_data["kcal"] = 0
-    u_data["proteinas"] = 0
-    u_data["carbos"] = 0
-    u_data["grasas"] = 0
-    u_data["historial_hoy"] = []
-    
-    guardar_datos()
-    return jsonify({
-        "status": "ok",
-        "resumen": registro_dia,
-        "racha_dias": racha
-    })
+        # Resetear día actual
+        u_data["kcal"] = 0
+        u_data["proteinas"] = 0
+        u_data["carbos"] = 0
+        u_data["grasas"] = 0
+        u_data["historial_hoy"] = []
+        
+        guardar_datos()
+        return jsonify({
+            "status": "ok",
+            "resumen": registro_dia,
+            "racha_dias": racha
+        })
+    except Exception as e:
+        print(f"[ERROR] API close-day: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Endpoint API: Favoritos del usuario
 @app.route('/api/user/<user_id>/favorites', methods=['GET', 'POST', 'DELETE'])
