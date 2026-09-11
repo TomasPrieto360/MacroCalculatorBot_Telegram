@@ -216,9 +216,29 @@ function renderPastDaysHistory() {
                 <p>Consumo: <strong>${Math.round(day.kcal)}</strong> / ${Math.round(day.meta_kcal)} kcal • ${day.comidas_count} comidas</p>
                 <p style="font-size:0.75rem; color:var(--text-secondary);">P: ${day.proteinas}g | C: ${day.carbos}g | G: ${day.grasas}g</p>
             </div>
-            <span class="badge ${day.cumplido ? 'badge-success' : ''}">${day.cumplido ? '✅ Meta Cumplida' : '📊 Cerrado'}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge ${day.cumplido ? 'badge-success' : ''}">${day.cumplido ? '✅ Meta Cumplida' : '📊 Cerrado'}</span>
+                <button class="delete-item-btn" onclick="deleteHistoryDay('${day.fecha}')" title="Eliminar registro de esta fecha">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
         </div>
     `).join('');
+}
+
+async function deleteHistoryDay(fecha) {
+    if (!confirm(`¿Eliminar el registro histórico del día ${fecha}?`)) return;
+    try {
+        const res = await fetch(`/api/user/${currentUser}/history-day/${fecha}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            await loadUserData();
+        } else {
+            alert('Error al eliminar fecha del historial');
+        }
+    } catch (e) {
+        alert('Error de red al eliminar fecha');
+    }
 }
 
 // Setup Event Listeners
@@ -260,10 +280,20 @@ function setupEventListeners() {
     document.getElementById('logQuantity').addEventListener('input', updateLivePreview);
     document.getElementById('logUnit').addEventListener('change', updateLivePreview);
 
-    // Botón Cerrar Día
+    // Botón Cerrar Día y Atajos de Fecha
     document.getElementById('btnOpenCloseDay').addEventListener('click', openCloseDayModal);
     document.getElementById('btnCancelCloseDay').addEventListener('click', closeCloseDayModal);
     document.getElementById('btnConfirmCloseDay').addEventListener('click', confirmCloseDay);
+    
+    document.getElementById('btnDateYesterday').addEventListener('click', () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        document.getElementById('closeDayDate').value = d.toISOString().split('T')[0];
+    });
+
+    document.getElementById('btnDateToday').addEventListener('click', () => {
+        document.getElementById('closeDayDate').value = new Date().toISOString().split('T')[0];
+    });
 
     // IA / Foto
     document.getElementById('aiPhotoInput').addEventListener('change', handleImageSelect);
@@ -401,6 +431,10 @@ function openCloseDayModal() {
     const goalKcal = Math.round(currentUserData.meta_kcal || 2000);
     const comidasCount = (currentUserData.historial_hoy || []).length;
 
+    // Inicializar fecha en HOY
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('closeDayDate').value = todayStr;
+
     document.getElementById('closeDaySummary').innerHTML = `
         <div style="font-size:1.1rem; font-weight:700; margin-bottom:6px;">Total consumido hoy: <span class="text-orange">${consumedKcal} kcal</span> / ${goalKcal} kcal</div>
         <div style="font-size:0.88rem; color:var(--text-secondary);">Proteínas: ${(currentUserData.proteinas||0).toFixed(1)}g | Carbos: ${(currentUserData.carbos||0).toFixed(1)}g | Grasas: ${(currentUserData.grasas||0).toFixed(1)}g</div>
@@ -414,14 +448,23 @@ function closeCloseDayModal() {
 }
 
 async function confirmCloseDay() {
+    const selectedDate = document.getElementById('closeDayDate').value;
+    if (!selectedDate) return alert('Por favor seleccioná una fecha válida.');
+
     try {
-        const res = await fetch(`/api/user/${currentUser}/close-day`, { method: 'POST' });
+        const res = await fetch(`/api/user/${currentUser}/close-day`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ fecha: selectedDate })
+        });
         const data = await res.json();
         closeCloseDayModal();
         if (data.status === 'ok') {
-            alert(`🎉 ¡Día Cerrado!\nTu nueva racha es de ${data.racha_dias} día(s).`);
+            alert(`🎉 ¡Día Cerrado (${selectedDate})!\nTu racha actual es de ${data.racha_dias} día(s).`);
             await loadUserData();
             switchTab('tab-dashboard');
+        } else {
+            alert(`Error: ${data.message || 'No se pudo cerrar el día'}`);
         }
     } catch (e) {
         alert('Error cerrando el día');

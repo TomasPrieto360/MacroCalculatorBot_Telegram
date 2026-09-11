@@ -1980,13 +1980,56 @@ def api_calculate_tdee(user_id):
         print(f"[ERROR] API TDEE: {e}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
-# Endpoint API: Terminar Día (Cerrar día, guardar historial y resetear)
+def calcular_racha_usuario(historial_dias):
+    """Calcula dinámicamente la racha de días consecutivos cumplidos desde el historial."""
+    if not historial_dias:
+        return 0
+        
+    dias_ordenados = sorted(historial_dias, key=lambda x: x.get("fecha", ""), reverse=True)
+    racha = 0
+    from datetime import datetime
+    
+    fecha_prev = None
+    for dia in dias_ordenados:
+        if not dia.get("cumplido"):
+            break
+        
+        fecha_str = dia.get("fecha")
+        if not fecha_str:
+            break
+            
+        try:
+            fecha_curr = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except Exception:
+            break
+            
+        if fecha_prev is None:
+            racha += 1
+            fecha_prev = fecha_curr
+        else:
+            diff = (fecha_prev - fecha_curr).days
+            if diff == 1:
+                racha += 1
+                fecha_prev = fecha_curr
+            elif diff == 0:
+                continue
+            else:
+                break
+                
+    return racha
+
+# Endpoint API: Terminar Día (Cerrar día, guardar historial con fecha elegida y resetear)
 @app.route('/api/user/<user_id>/close-day', methods=['POST'])
 def api_close_day(user_id):
     try:
         from datetime import datetime
+        req_data = request.get_json() or {}
+        fecha_cierre = str(req_data.get("fecha", "")).strip()
+        
+        if not fecha_cierre:
+            fecha_cierre = datetime.now().strftime("%Y-%m-%d")
+
         u_data = datos_usuarios[user_id]
-        fecha_hoy = datetime.now().strftime("%Y-%m-%d")
         
         consumed_kcal = round(u_data.get("kcal", 0), 1)
         consumed_prot = round(u_data.get("proteinas", 0), 1)
@@ -1997,15 +2040,8 @@ def api_close_day(user_id):
         # Evaluar si cumplió la meta (dentro de +-15% de margen)
         cumplido = abs(consumed_kcal - meta_k) <= (meta_k * 0.15) or (consumed_kcal >= meta_k * 0.85 and consumed_kcal <= meta_k * 1.15)
         
-        racha = u_data.get("racha_dias", 0)
-        if cumplido:
-            racha += 1
-        else:
-            racha = 0
-        u_data["racha_dias"] = racha
-
         registro_dia = {
-            "fecha": fecha_hoy,
+            "fecha": fecha_cierre,
             "kcal": consumed_kcal,
             "proteinas": consumed_prot,
             "carbos": consumed_carb,
@@ -2017,9 +2053,25 @@ def api_close_day(user_id):
         
         if "historial_dias" not in u_data:
             u_data["historial_dias"] = []
-        u_data["historial_dias"].insert(0, registro_dia)
-        # Limitar historial guardado a 90 días
-        u_data["historial_dias"] = u_data["historial_dias"][:90]
+            
+        # Si ya existía un registro para esa fecha, actualizarlo
+        existente_idx = -1
+        for idx, item in enumerate(u_data["historial_dias"]):
+            if item.get("fecha") == fecha_cierre:
+                existente_idx = idx
+                break
+                
+        if existente_idx >= 0:
+            u_data["historial_dias"][existente_idx] = registro_dia
+        else:
+            u_data["historial_dias"].append(registro_dia)
+            
+        # Re-ordenar por fecha descendente y limitar a 90 días
+        u_data["historial_dias"] = sorted(u_data["historial_dias"], key=lambda x: x.get("fecha", ""), reverse=True)[:90]
+
+        # Calcular racha dinámica
+        racha = calcular_racha_usuario(u_data["historial_dias"])
+        u_data["racha_dias"] = racha
 
         # Resetear día actual
         u_data["kcal"] = 0
@@ -2036,6 +2088,27 @@ def api_close_day(user_id):
         })
     except Exception as e:
         print(f"[ERROR] API close-day: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Endpoint API: Eliminar un día del historial pasado
+@app.route('/api/user/<user_id>/history-day/<fecha>', methods=['DELETE'])
+def api_delete_history_day(user_id, fecha):
+    try:
+        u_data = datos_usuarios[user_id]
+        hist = u_data.get("historial_dias", [])
+        
+        u_data["historial_dias"] = [d for d in hist if d.get("fecha") != fecha]
+        racha = calcular_racha_usuario(u_data["historial_dias"])
+        u_data["racha_dias"] = racha
+        
+        guardar_datos()
+        return jsonify({
+            "status": "ok",
+            "racha_dias": racha,
+            "historial_dias": u_data["historial_dias"]
+        })
+    except Exception as e:
+        print(f"[ERROR] API delete-history-day: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Endpoint API: Favoritos del usuario

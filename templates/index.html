@@ -400,7 +400,16 @@
                     <i class="fa-solid fa-trophy text-gold"></i>
                 </div>
                 <h3 class="modal-title">¿Cerrar y Terminar el Día?</h3>
-                <p class="modal-subtitle">Se guardará el resumen de consumos en tu historial y se reiniciará el contador para mañana.</p>
+                <p class="modal-subtitle">Elegí a qué fecha corresponde este cierre de jornada:</p>
+
+                <div class="form-group margin-top" style="text-align:left;">
+                    <label for="closeDayDate"><i class="fa-solid fa-calendar"></i> Fecha del cierre:</label>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <input type="date" id="closeDayDate" style="flex:2;">
+                        <button type="button" id="btnDateYesterday" class="btn btn-outline" style="flex:1; padding:8px 10px; font-size:0.82rem;">Fue Ayer</button>
+                        <button type="button" id="btnDateToday" class="btn btn-outline" style="flex:1; padding:8px 10px; font-size:0.82rem;">Hoy</button>
+                    </div>
+                </div>
                 
                 <div id="closeDaySummary" class="close-day-summary-box margin-top">
                     <!-- Resumen del día se inserta vía JS -->
