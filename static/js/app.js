@@ -563,6 +563,23 @@ async function switchCameraFacing() {
 }
 
 async function startLiveScanner() {
+    // 1. Si la app se ejecuta en un celular dentro de Telegram, usar el ESCÁNER NATIVO DE CÁMARA DE TELEGRAM
+    if (tg && typeof tg.showScanQr === 'function') {
+        try {
+            tg.showScanQr({ text: 'Apuntá al código de barras o QR del producto' }, (text) => {
+                if (text) {
+                    tg.closeScanQr();
+                    onBarcodeScanned(text);
+                }
+                return true;
+            });
+            return;
+        } catch (err) {
+            console.warn('Fallback a cámara web HTML5:', err);
+        }
+    }
+
+    // 2. Para navegadores web móviles fuera de Telegram
     if (typeof Html5Qrcode === 'undefined') {
         alert('Cargando motor de cámara... Intentá de nuevo en un segundo.');
         return;
