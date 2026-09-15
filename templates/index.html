@@ -19,6 +19,9 @@
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+    <!-- HTML5 QR / Barcode Scanner SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
     <!-- CSS Principal -->
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -151,25 +154,61 @@
                 </div>
             </section>
 
-            <!-- PESTAÑA 3: ASISTENTE IA & ESCÁNER DE FOTOS -->
+            <!-- PESTAÑA 3: ASISTENTE IA & ESCÁNER DE FOTOS / CÓDIGOS -->
             <section id="tab-ai" class="tab-page">
                 <div class="card glass-card">
-                    <h3 class="card-title"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i> Escáner IA con Foto</h3>
-                    <p class="card-desc">Subí una foto de tu **Plato de Comida** o de una **Etiqueta Nutricional**. Podés agregar detalles por texto para guiar a la IA.</p>
+                    <h3 class="card-title"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i> Escáner IA & Código de Barras</h3>
+                    <p id="aiTabSubtitle" class="card-desc">Escaneá en vivo el **código de barras/QR**, subí foto de una **Etiqueta** o foto de tu **Plato de Comida**.</p>
                     
                     <div class="ai-tabs">
                         <button id="btnAiMealTab" class="ai-tab-btn active" onclick="switchAiMode('meal')">
                             <i class="fa-solid fa-utensils"></i> Plato de Comida
                         </button>
                         <button id="btnAiLabelTab" class="ai-tab-btn" onclick="switchAiMode('label')">
-                            <i class="fa-solid fa-barcode"></i> Etiqueta
+                            <i class="fa-solid fa-barcode"></i> Código / Etiqueta
                         </button>
                         <button id="btnAiTextTab" class="ai-tab-btn" onclick="switchAiMode('text')">
                             <i class="fa-solid fa-font"></i> Texto
                         </button>
                     </div>
 
-                    <!-- Modo Foto (Plato o Etiqueta) -->
+                    <!-- Sub-pestañas para Modo Código / Etiqueta -->
+                    <div id="labelSubTabs" class="label-sub-tabs hidden">
+                        <button id="btnSubTabLive" class="sub-tab-btn active" onclick="switchLabelSubMode('live')">
+                            <i class="fa-solid fa-camera"></i> Escáner en Vivo
+                        </button>
+                        <button id="btnSubTabPhoto" class="sub-tab-btn" onclick="switchLabelSubMode('photo')">
+                            <i class="fa-solid fa-file-image"></i> Foto de Etiqueta (IA)
+                        </button>
+                    </div>
+
+                    <!-- MODO 1: ESCÁNER DE CÓDIGO DE BARRAS EN VIVO -->
+                    <div id="aiModeLiveScanner" class="ai-mode-container hidden">
+                        <div class="scanner-viewfinder">
+                            <div id="liveBarcodeReader"></div>
+                            <div class="scanner-overlay">
+                                <div class="scanner-box">
+                                    <div class="corner top-left"></div>
+                                    <div class="corner top-right"></div>
+                                    <div class="corner bottom-left"></div>
+                                    <div class="corner bottom-right"></div>
+                                    <div class="laser-line"></div>
+                                </div>
+                                <p class="scanner-hint">Apuntá al código de barras o QR para escanear en tiempo real</p>
+                            </div>
+                        </div>
+
+                        <div class="scanner-controls margin-top">
+                            <button id="btnToggleCamera" class="btn btn-primary flex-1">
+                                <i class="fa-solid fa-video"></i> Iniciar Cámara
+                            </button>
+                            <button id="btnSwitchCamera" class="btn btn-outline" title="Cambiar cámara trasera/frontal">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- MODO 2: FOTO (PLATO O ETIQUETA) -->
                     <div id="aiModePhoto" class="ai-mode-container">
                         <div class="file-upload-zone" onclick="document.getElementById('aiPhotoInput').click()">
                             <i class="fa-solid fa-camera upload-icon"></i>
@@ -182,7 +221,8 @@
                             <button id="btnRemoveImage" class="btn-icon-remove"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
 
-                        <div class="form-group margin-top">
+                        <!-- Detalles Adicionales (Visible solo en Plato de Comida) -->
+                        <div id="aiPhotoDetailsGroup" class="form-group margin-top">
                             <label for="aiPhotoDetails"><i class="fa-solid fa-pen-fancy"></i> Detalles adicionales (Opcional):</label>
                             <textarea id="aiPhotoDetails" rows="2" placeholder="Ej: Es milanesa de pollo con puré de papas, cocinada al horno con aceite de oliva..."></textarea>
                         </div>
@@ -192,7 +232,7 @@
                         </button>
                     </div>
 
-                    <!-- Modo Texto -->
+                    <!-- MODO 3: TEXTO LIBRE -->
                     <div id="aiModeText" class="ai-mode-container hidden">
                         <div class="form-group">
                             <label for="aiTextInput">Descripción de la comida:</label>
@@ -418,6 +458,47 @@
                 <div class="modal-actions margin-top">
                     <button id="btnCancelCloseDay" class="btn btn-secondary flex-1">Volver</button>
                     <button id="btnConfirmCloseDay" class="btn btn-success flex-1">¡Sí, Cerrar Día!</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 3: PRODUCTO DETECTADO Y SELECCIÓN DE PORCIÓN -->
+        <div id="portionModal" class="modal hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-icon-header">
+                    <i class="fa-solid fa-barcode text-orange"></i>
+                </div>
+                <h3 id="portionFoodTitle" class="modal-title" style="text-transform: capitalize;">Producto Detectado</h3>
+                <p id="portionFoodSubtitle" class="modal-subtitle">Valores por 100g: 0 kcal | P: 0g | C: 0g | G: 0g</p>
+
+                <div class="portion-question-box margin-top">
+                    <label class="question-label"><i class="fa-solid fa-weight-scale text-orange"></i> ¿Cuánto consumiste de este producto?</label>
+                    
+                    <div id="portionQuickButtons" class="quick-portion-btns">
+                        <button type="button" class="btn-portion-chip" onclick="setPortionGrams(50)">50g</button>
+                        <button type="button" class="btn-portion-chip active" onclick="setPortionGrams(100)">100g</button>
+                        <button type="button" class="btn-portion-chip" onclick="setPortionGrams(150)">150g</button>
+                        <button type="button" class="btn-portion-chip" onclick="setPortionGrams(200)">200g</button>
+                        <button type="button" id="btnFullPackage" class="btn-portion-chip full-pkg hidden" onclick="setFullPackagePortion()">📦 Todo el envase</button>
+                    </div>
+
+                    <div class="form-group margin-top">
+                        <label for="portionGramsInput">O ingresá los gramos consumidos:</label>
+                        <div class="quantity-input-group">
+                            <input type="number" id="portionGramsInput" value="100" min="1" step="1">
+                            <span class="unit-badge">gramos</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="portionLivePreview" class="live-macro-preview margin-top">
+                    <!-- Vista previa dinámica de calorías y macros finales -->
+                </div>
+
+                <div class="modal-actions margin-top">
+                    <button id="btnCancelPortion" class="btn btn-secondary">Cancelar</button>
+                    <button id="btnSavePortionFav" class="btn btn-outline" title="Guardar a Favoritos"><i class="fa-solid fa-star text-gold"></i></button>
+                    <button id="btnConfirmPortionLog" class="btn btn-success flex-1"><i class="fa-solid fa-check"></i> Registrar en el Día</button>
                 </div>
             </div>
         </div>

@@ -5,6 +5,13 @@ let selectedFoodForLog = null;
 let currentAiParsedFood = null;
 let currentAiMode = 'meal'; // 'meal', 'label', 'text'
 
+// Variables para Escáner de Código de Barras y Porciones
+let html5QrcodeScanner = null;
+let isCameraRunning = false;
+let currentFacingMode = 'environment';
+let currentLabelSubMode = 'live'; // 'live', 'photo'
+let selectedDetectedFood = null;
+
 // Inicialización de Telegram WebApp SDK (opcional si corre dentro de Telegram)
 const tg = window.Telegram?.WebApp;
 if (tg) {
@@ -295,13 +302,23 @@ function setupEventListeners() {
         document.getElementById('closeDayDate').value = new Date().toISOString().split('T')[0];
     });
 
-    // IA / Foto
+    // IA / Foto & Cámara
     document.getElementById('aiPhotoInput').addEventListener('change', handleImageSelect);
     document.getElementById('btnRemoveImage').addEventListener('click', resetPhotoUpload);
     document.getElementById('btnSubmitAiPhoto').addEventListener('click', submitAiPhoto);
     document.getElementById('btnSubmitAiText').addEventListener('click', submitAiText);
     document.getElementById('btnLogAiResult').addEventListener('click', logAiResult);
     document.getElementById('btnSaveFavoriteAi').addEventListener('click', saveFavoriteFromAi);
+
+    // Escáner en Vivo & Controles de Cámara
+    document.getElementById('btnToggleCamera').addEventListener('click', toggleLiveCamera);
+    document.getElementById('btnSwitchCamera').addEventListener('click', switchCameraFacing);
+
+    // Modal Porción / Gramos Detectados
+    document.getElementById('portionGramsInput').addEventListener('input', updatePortionPreview);
+    document.getElementById('btnConfirmPortionLog').addEventListener('click', confirmPortionLog);
+    document.getElementById('btnSavePortionFav').addEventListener('click', savePortionFavorite);
+    document.getElementById('btnCancelPortion').addEventListener('click', closePortionModal);
 
     // Recetas Heladera
     document.getElementById('btnGenerateFridgeRecipes').addEventListener('click', generateFridgeRecipes);
@@ -471,15 +488,297 @@ async function confirmCloseDay() {
     }
 }
 
-// IA - Selección de Modo
+// IA - Selección de Modo Principal (Plato, Etiqueta, Texto)
 function switchAiMode(mode) {
     currentAiMode = mode;
     document.getElementById('btnAiMealTab').classList.toggle('active', mode === 'meal');
     document.getElementById('btnAiLabelTab').classList.toggle('active', mode === 'label');
     document.getElementById('btnAiTextTab').classList.toggle('active', mode === 'text');
 
-    document.getElementById('aiModePhoto').classList.toggle('hidden', mode === 'text');
-    document.getElementById('aiModeText').classList.toggle('hidden', mode !== 'text');
+    const labelSubTabs = document.getElementById('labelSubTabs');
+    const photoContainer = document.getElementById('aiModePhoto');
+    const liveScannerContainer = document.getElementById('aiModeLiveScanner');
+    const textContainer = document.getElementById('aiModeText');
+    const photoDetailsGroup = document.getElementById('aiPhotoDetailsGroup');
+
+    if (mode === 'meal') {
+        stopLiveScanner();
+        labelSubTabs.classList.add('hidden');
+        liveScannerContainer.classList.add('hidden');
+        photoContainer.classList.remove('hidden');
+        textContainer.classList.add('hidden');
+        photoDetailsGroup.classList.remove('hidden');
+        document.getElementById('aiTabSubtitle').innerHTML = 'Subí una foto de tu <strong>Plato de Comida</strong> y la IA identificará la preparación y porción.';
+    } else if (mode === 'label') {
+        labelSubTabs.classList.remove('hidden');
+        photoDetailsGroup.classList.add('hidden'); // Ocultar detalles manuales en modo etiqueta
+        textContainer.classList.add('hidden');
+        document.getElementById('aiTabSubtitle').innerHTML = 'Escaneá el <strong>Código de Barras</strong> en vivo con la cámara o subí una foto de la <strong>Etiqueta Nutricional</strong>.';
+        switchLabelSubMode(currentLabelSubMode || 'live');
+    } else if (mode === 'text') {
+        stopLiveScanner();
+        labelSubTabs.classList.add('hidden');
+        liveScannerContainer.classList.add('hidden');
+        photoContainer.classList.add('hidden');
+        textContainer.classList.remove('hidden');
+        document.getElementById('aiTabSubtitle').innerHTML = 'Describí lo que comiste en texto libre y la IA calculará tus calorías y macros.';
+    }
+}
+
+// IA - Selección de Sub-Modo de Etiquetas (Cámara en Vivo vs Subir Foto)
+function switchLabelSubMode(subMode) {
+    currentLabelSubMode = subMode;
+    document.getElementById('btnSubTabLive').classList.toggle('active', subMode === 'live');
+    document.getElementById('btnSubTabPhoto').classList.toggle('active', subMode === 'photo');
+
+    const liveScannerContainer = document.getElementById('aiModeLiveScanner');
+    const photoContainer = document.getElementById('aiModePhoto');
+
+    if (subMode === 'live') {
+        photoContainer.classList.add('hidden');
+        liveScannerContainer.classList.remove('hidden');
+        startLiveScanner();
+    } else {
+        stopLiveScanner();
+        liveScannerContainer.classList.add('hidden');
+        photoContainer.classList.remove('hidden');
+    }
+}
+
+// --- CONTROL DE CÁMARA EN VIVO & ESCÁNER DE CÓDIGOS ---
+async function toggleLiveCamera() {
+    if (isCameraRunning) {
+        await stopLiveScanner();
+    } else {
+        await startLiveScanner();
+    }
+}
+
+async function switchCameraFacing() {
+    currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+    if (isCameraRunning) {
+        await stopLiveScanner();
+        await startLiveScanner();
+    }
+}
+
+async function startLiveScanner() {
+    if (typeof Html5Qrcode === 'undefined') {
+        alert('Cargando motor de cámara... Intentá de nuevo en un segundo.');
+        return;
+    }
+
+    const btnToggle = document.getElementById('btnToggleCamera');
+    btnToggle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
+
+    try {
+        if (!html5QrcodeScanner) {
+            html5QrcodeScanner = new Html5Qrcode("liveBarcodeReader");
+        }
+
+        const config = {
+            fps: 15,
+            qrbox: { width: 220, height: 170 },
+            aspectRatio: 1.333333
+        };
+
+        await html5QrcodeScanner.start(
+            { facingMode: currentFacingMode },
+            config,
+            onBarcodeScanned,
+            () => {}
+        );
+
+        isCameraRunning = true;
+        btnToggle.classList.remove('btn-primary');
+        btnToggle.classList.add('btn-secondary');
+        btnToggle.innerHTML = '<i class="fa-solid fa-video-slash"></i> Detener Cámara';
+    } catch (e) {
+        console.error('Error al iniciar cámara:', e);
+        btnToggle.classList.remove('btn-secondary');
+        btnToggle.classList.add('btn-primary');
+        btnToggle.innerHTML = '<i class="fa-solid fa-video"></i> Iniciar Cámara';
+        isCameraRunning = false;
+    }
+}
+
+async function stopLiveScanner() {
+    if (html5QrcodeScanner && isCameraRunning) {
+        try {
+            await html5QrcodeScanner.stop();
+        } catch (e) {
+            console.error('Error al detener cámara:', e);
+        }
+    }
+    isCameraRunning = false;
+    const btnToggle = document.getElementById('btnToggleCamera');
+    if (btnToggle) {
+        btnToggle.classList.remove('btn-secondary');
+        btnToggle.classList.add('btn-primary');
+        btnToggle.innerHTML = '<i class="fa-solid fa-video"></i> Iniciar Cámara';
+    }
+}
+
+let lastScannedCode = null;
+let lastScanTime = 0;
+
+async function onBarcodeScanned(decodedText) {
+    const now = Date.now();
+    if (decodedText === lastScannedCode && (now - lastScanTime) < 3000) {
+        return;
+    }
+    lastScannedCode = decodedText;
+    lastScanTime = now;
+
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+    } else if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+    }
+
+    await stopLiveScanner();
+    fetchBarcodeProduct(decodedText);
+}
+
+async function fetchBarcodeProduct(barcode) {
+    try {
+        const res = await fetch(`/api/barcode/${encodeURIComponent(barcode)}`);
+        const data = await res.json();
+
+        if (data.status === 'ok' && data.alimento) {
+            openPortionModal(data.alimento);
+        } else {
+            alert(`🔍 Código (${barcode}) no encontrado en Open Food Facts.\n\nPasá a la pestaña "Foto de Etiqueta" para sacarle foto a la información nutricional con la IA.`);
+            switchLabelSubMode('photo');
+        }
+    } catch (e) {
+        alert(`Error al consultar el código de barras ${barcode}`);
+    }
+}
+
+// --- MODAL DE SELECCIÓN DE PORCIÓN / GRAMOS CONSUMIDOS ---
+function openPortionModal(food) {
+    selectedDetectedFood = food;
+    const modal = document.getElementById('portionModal');
+    const title = document.getElementById('portionFoodTitle');
+    const subtitle = document.getElementById('portionFoodSubtitle');
+    const btnFullPkg = document.getElementById('btnFullPackage');
+
+    title.textContent = food.alimento || food.nombre || 'Producto Detectado';
+
+    const kcal100 = food.kcal || 0;
+    const p100 = food.proteinas || 0;
+    const c100 = food.carbos || 0;
+    const g100 = food.grasas || 0;
+
+    subtitle.textContent = `Valores 100g: ${Math.round(kcal100)} kcal | P: ${p100.toFixed(1)}g | C: ${c100.toFixed(1)}g | G: ${g100.toFixed(1)}g`;
+
+    const pkgWeight = food.peso_porcion || food.peso_unidad || food.cantidad_estimada_g;
+    if (pkgWeight && pkgWeight > 0) {
+        btnFullPkg.textContent = `📦 Envase/Porción (${pkgWeight}g)`;
+        btnFullPkg.dataset.grams = pkgWeight;
+        btnFullPkg.classList.remove('hidden');
+    } else {
+        btnFullPkg.classList.add('hidden');
+    }
+
+    const defaultGrams = pkgWeight || 100;
+    document.getElementById('portionGramsInput').value = defaultGrams;
+
+    document.querySelectorAll('.btn-portion-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.textContent.trim() === `${defaultGrams}g`);
+    });
+
+    updatePortionPreview();
+    modal.classList.remove('hidden');
+}
+
+function setPortionGrams(grams) {
+    document.getElementById('portionGramsInput').value = grams;
+    document.querySelectorAll('.btn-portion-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.textContent.trim() === `${grams}g`);
+    });
+    updatePortionPreview();
+}
+
+function setFullPackagePortion() {
+    const btnFullPkg = document.getElementById('btnFullPackage');
+    const grams = parseFloat(btnFullPkg.dataset.grams) || 100;
+    document.getElementById('portionGramsInput').value = grams;
+    document.querySelectorAll('.btn-portion-chip').forEach(chip => chip.classList.remove('active'));
+    btnFullPkg.classList.add('active');
+    updatePortionPreview();
+}
+
+function updatePortionPreview() {
+    if (!selectedDetectedFood) return;
+
+    const grams = parseFloat(document.getElementById('portionGramsInput').value) || 100;
+    const kcal100 = selectedDetectedFood.kcal || 0;
+    const p100 = selectedDetectedFood.proteinas || 0;
+    const c100 = selectedDetectedFood.carbos || 0;
+    const g100 = selectedDetectedFood.grasas || 0;
+
+    const totalKcal = Math.round((kcal100 * grams) / 100);
+    const totalP = ((p100 * grams) / 100).toFixed(1);
+    const totalC = ((c100 * grams) / 100).toFixed(1);
+    const totalG = ((g100 * grams) / 100).toFixed(1);
+
+    document.getElementById('portionLivePreview').innerHTML = `
+        ⚡ Consumo calculado (<strong>${grams}g</strong>): <strong class="text-orange" style="font-size:1.1rem;">${totalKcal} kcal</strong><br>
+        🥩 Proteínas: <strong>${totalP}g</strong> | 🌾 Carbos: <strong>${totalC}g</strong> | 🥑 Grasas: <strong>${totalG}g</strong>
+    `;
+}
+
+function closePortionModal() {
+    document.getElementById('portionModal').classList.add('hidden');
+    selectedDetectedFood = null;
+}
+
+async function confirmPortionLog() {
+    if (!selectedDetectedFood) return;
+    const grams = parseFloat(document.getElementById('portionGramsInput').value) || 100;
+
+    try {
+        await fetch(`/api/user/${currentUser}/log`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                alimento: selectedDetectedFood.alimento || selectedDetectedFood.nombre || 'Producto Escaneado',
+                cantidad: grams,
+                unidad: 'g',
+                stats: selectedDetectedFood
+            })
+        });
+
+        closePortionModal();
+        if (tg) tg.HapticFeedback?.notificationOccurred('success');
+        await loadUserData();
+        switchTab('tab-dashboard');
+    } catch (e) {
+        alert('Error al registrar alimento en la jornada');
+    }
+}
+
+async function savePortionFavorite() {
+    if (!selectedDetectedFood) return;
+    try {
+        await fetch(`/api/user/${currentUser}/favorites`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                nombre: selectedDetectedFood.alimento || selectedDetectedFood.nombre || 'Favorito Escaneado',
+                kcal: selectedDetectedFood.kcal || 0,
+                proteinas: selectedDetectedFood.proteinas || 0,
+                carbos: selectedDetectedFood.carbos || 0,
+                grasas: selectedDetectedFood.grasas || 0
+            })
+        });
+        alert('¡Producto guardado en tus favoritos!');
+        await loadUserData();
+    } catch (e) {
+        alert('Error al guardar en favoritos');
+    }
 }
 
 function handleImageSelect(e) {
@@ -527,7 +826,11 @@ async function submitAiPhoto() {
         });
         const data = await res.json();
         if (data.status === 'ok') {
-            displayAiResult(data.parsed);
+            if (currentAiMode === 'label') {
+                openPortionModal(data.parsed);
+            } else {
+                displayAiResult(data.parsed);
+            }
         } else {
             alert(data.message || 'No se pudo analizar la foto');
         }
@@ -719,6 +1022,9 @@ async function deleteHistoryItem(itemId) {
 
 // Navegación Pestañas
 function switchTab(tabId) {
+    if (tabId !== 'tab-ai') {
+        stopLiveScanner();
+    }
     document.querySelectorAll('.tab-page').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
 

@@ -3,6 +3,7 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 import json
 import os
 import sys
+import base64
 from datetime import datetime
 import time
 from dotenv import load_dotenv
@@ -2226,6 +2227,61 @@ def api_parse_food():
         print(f"[ERROR] API Gemini Parse: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def clean_json_from_llm(raw_text):
+    """Limpia y extrae de forma segura objetos/arrays JSON generados por el modelo IA."""
+    if not raw_text:
+        return {}
+    clean = raw_text.strip()
+    if "```" in clean:
+        lines = clean.splitlines()
+        filtered = []
+        for line in lines:
+            if line.strip().startswith("```"):
+                continue
+            filtered.append(line)
+        clean = "\n".join(filtered).strip()
+    try:
+        return json.loads(clean)
+    except Exception:
+        import re
+        match = re.search(r'(\{.*\}|\[.*\])', clean, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+        raise
+
+# Endpoint API: Buscar producto por Código de Barras directo
+@app.route('/api/barcode/<code_str>')
+def api_barcode(code_str):
+    code_clean = str(code_str).strip()
+    if not code_clean:
+        return jsonify({"status": "error", "message": "Código de barras no provisto"}), 400
+        
+    try:
+        # 1. Buscar en Open Food Facts por EAN
+        off = buscar_open_food_facts(code_clean)
+        if off and off.get("kcal", 0) > 0:
+            return jsonify({"status": "ok", "alimento": off})
+            
+        # 2. Buscar en MongoDB global
+        doc = buscar_alimento_mongo_global(code_clean)
+        if doc:
+            return jsonify({
+                "status": "ok",
+                "alimento": {
+                    "alimento": doc["_id"],
+                    "kcal": doc.get("kcal", 0),
+                    "proteinas": doc.get("proteinas", 0),
+                    "carbos": doc.get("carbos", 0),
+                    "grasas": doc.get("grasas", 0),
+                    "fuente": "mongo"
+                }
+            })
+            
+        return jsonify({"status": "error", "message": f"No se encontró información para el código {code_clean}"}), 404
+    except Exception as e:
+        print(f"[ERROR] API Barcode: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Endpoint API: Analizar Foto de Comida con IA Vision + Texto de ayuda opcional
 @app.route('/api/ai/scan-meal-photo', methods=['POST'])
 def api_scan_meal_photo():
@@ -2237,9 +2293,13 @@ def api_scan_meal_photo():
         return jsonify({"status": "error", "message": "Imagen no enviada"}), 400
         
     try:
-        # Remover prefijo data:image/...;base64, si existe
+        mime_type = "image/jpeg"
         if "," in img_b64:
-            img_b64 = img_b64.split(",", 1)[1]
+            header, img_b64 = img_b64.split(",", 1)
+            if "image/png" in header:
+                mime_type = "image/png"
+            elif "image/webp" in header:
+                mime_type = "image/webp"
             
         img_bytes = base64.b64decode(img_b64)
         
@@ -2264,16 +2324,15 @@ def api_scan_meal_photo():
         res = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
-                types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
                 prompt
             ]
         )
-        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
-        parsed = json.loads(raw_text)
+        parsed = clean_json_from_llm(res.text)
         return jsonify({"status": "ok", "parsed": parsed})
     except Exception as e:
         print(f"[ERROR] API Scan Meal Photo: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": f"Error procesando imagen: {str(e)}"}), 500
 
 # Endpoint API: Escanear etiqueta con Gemini Vision + Texto opcional
 @app.route('/api/ai/scan-label', methods=['POST'])
@@ -2286,39 +2345,45 @@ def api_scan_label():
         return jsonify({"status": "error", "message": "Imagen no enviada"}), 400
         
     try:
+        mime_type = "image/jpeg"
         if "," in img_b64:
-            img_b64 = img_b64.split(",", 1)[1]
+            header, img_b64 = img_b64.split(",", 1)
+            if "image/png" in header:
+                mime_type = "image/png"
+            elif "image/webp" in header:
+                mime_type = "image/webp"
             
         img_bytes = base64.b64decode(img_b64)
         prompt = (
-            "Analizá la etiqueta nutricional en la imagen. "
-            "Extraé los valores por 100g / 100ml.\n"
-            + (f"PISTA ADICIONAL O NOMBRE DEL PRODUCTO DADO POR EL USUARIO: '{text_hint}'.\n" if text_hint else "") +
+            "Analizá cuidadosamente la información nutreicional o etiqueta en esta imagen.\n"
+            "Extraé o calcula los valores exactos POR 100g O 100ml de producto.\n"
+            + (f"PISTA ADICIONAL O NOMBRE DEL PRODUCTO: '{text_hint}'.\n" if text_hint else "") +
             "Devuelve ÚNICAMENTE un JSON válido con este formato exacto:\n"
             "{\n"
-            '  "alimento": "nombre del producto o marca",\n'
+            '  "alimento": "Nombre del producto o marca detectada",\n'
             '  "kcal": 000,\n'
             '  "proteinas": 00.0,\n'
             '  "carbos": 00.0,\n'
-            '  "grasas": 00.0\n'
+            '  "grasas": 00.0,\n'
+            '  "peso_porcion": 100\n'
             "}\n"
-            "Solo responde con el objeto JSON."
+            "Nota: 'peso_porcion' es la porción sugerida por el fabricante si aparece en la etiqueta (ej: 30g para 3 galletitas). Si no aparece, pon 100.\n"
+            "Solo responde con el objeto JSON sin texto extra."
         )
         
         from google.genai import types
         res = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
-                types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
                 prompt
             ]
         )
-        raw_text = res.text.strip().replace("```json", "").replace("```", "").strip()
-        parsed = json.loads(raw_text)
+        parsed = clean_json_from_llm(res.text)
         return jsonify({"status": "ok", "parsed": parsed})
     except Exception as e:
         print(f"[ERROR] API Gemini Label Scan: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": f"Error procesando etiqueta: {str(e)}"}), 500
 
 # Endpoint API: Recetas de Heladera con IA
 @app.route('/api/ai/fridge-recipes', methods=['POST'])

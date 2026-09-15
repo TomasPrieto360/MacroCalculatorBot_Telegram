@@ -810,3 +810,171 @@ body {
 .text-gold { color: var(--color-gold); }
 .text-cyan { color: var(--color-cyan); }
 .text-center { text-align: center; }
+
+/* SUB TABS & SCANNER EN VIVO */
+.label-sub-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    background: rgba(15, 23, 42, 0.4);
+    padding: 4px;
+    border-radius: var(--radius-md);
+}
+
+.sub-tab-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.sub-tab-btn.active {
+    background: var(--color-orange);
+    color: #fff;
+}
+
+/* CAMERA VIEWFINDER & LASER LINE */
+.scanner-viewfinder {
+    position: relative;
+    width: 100%;
+    min-height: 250px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#liveBarcodeReader {
+    width: 100%;
+    height: 100%;
+}
+
+#liveBarcodeReader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: var(--radius-md);
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.scanner-box {
+    position: relative;
+    width: 220px;
+    height: 170px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+}
+
+.corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: var(--color-orange);
+    border-style: solid;
+}
+
+.top-left { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 8px; }
+.top-right { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 8px; }
+.bottom-left { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 8px; }
+.bottom-right { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 8px; }
+
+.laser-line {
+    position: absolute;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #ff3b30, #ff9500, #ff3b30, transparent);
+    box-shadow: 0 0 12px #ff3b30, 0 0 6px #ff9500;
+    top: 10px;
+    animation: laserScan 2s infinite ease-in-out;
+}
+
+@keyframes laserScan {
+    0% { top: 8%; opacity: 0.8; }
+    50% { top: 88%; opacity: 1; }
+    100% { top: 8%; opacity: 0.8; }
+}
+
+.scanner-hint {
+    margin-top: 12px;
+    font-size: 0.78rem;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
+.scanner-controls {
+    display: flex;
+    gap: 10px;
+}
+
+/* QUICK PORTION CHIPS & BADGE */
+.quick-portion-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.btn-portion-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--bg-card-border);
+    background: rgba(15, 23, 42, 0.6);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-portion-chip.active, .btn-portion-chip:active {
+    background: var(--color-orange);
+    color: #fff;
+    border-color: var(--color-orange);
+}
+
+.btn-portion-chip.full-pkg {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: var(--color-green);
+}
+
+.unit-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--bg-card-border);
+    padding: 0 14px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
