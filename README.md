@@ -1,135 +1,70 @@
-# 🤖 MacroBot - Asistente Nutricional para Telegram
+# 📱 Macro Calculator App - Aplicación Móvil Nutricional
 
-MacroBot es un bot de Telegram para seguimiento nutricional. Permite registrar comidas, crear recetas, escanear etiquetas y consultar una IA nutricional.
+Macro Calculator App es una Web App Móvil PWA para seguimiento nutricional. Permite registrar comidas, consultar bases de datos nutricionales y de supermercado (Open Food Facts), escanear códigos de barras, armar recetas y consultar una IA nutricional impulsada por Google Gemini.
 
 ## ✨ Características
 
-- 📊 **Cálculo de Macros** - Registrá `150 pollo` y el bot calcula kcal, proteínas, carbs y grasas
-- 👤 **Perfil Personal** - Calcula tu TDEE con fórmula Mifflin-St Jeor
-- 📦 **Paquetes Personalizados** - Cargá productos del supermercado escaneando sus etiquetas
-- 🍳 **Sistema de Recetas** - Armá recetas y el bot recalcula valores a 100g
-- 🧠 **IA Nutricional** - Consultale a Gemini qué podés preparar con lo que tengas
-- 📝 **Agregar Macros (IA)** - Registrá comidas rápidas o complejas describiéndoselas a la IA (ej: "fideos con pesto y crema")
-- 📷 **Scanner de Etiquetas** - Enviá foto de una etiqueta y el bot la lee automáticamente
-- ☁️ **MongoDB** - Base de datos en la nube (no más JSONs locales)
-
-## 🚀 Deploy a Render (Producción)
-
-### Prerrequisitos
-
-1. Cuenta en [Render.com](https://render.com)
-2. MongoDB Atlas (cluster gratuito) con connection string
-3. Token de tu bot de Telegram (@BotFather)
-4. API Key de Google Gemini (https://aistudio.google.com/app/apikey)
-
-### Pasos
-
-#### 1. Prepará tu entorno local
-
-```bash
-# Cloná el repo
-git clone https://github.com/TU_USUARIO/MacroBot.git
-cd MacroBot
-
-# Copiá y configurá el .env
-copy .env.example .env
-# Editá .env con tus datos reales
-```
-
-#### 2. Subí el código a GitHub
-
-```bash
-git add .
-git commit -m "Ready for Render deploy"
-git push origin main
-```
-
-#### 3. Creá el servicio en Render
-
-1. Ir a [Dashboard de Render](https://dashboard.render.com)
-2. Click en **"New +"** → **"Web Service"**
-3. Conectá tu repositorio de GitHub
-4. Configurá:
-   - **Name**: macrobot
-   - **Environment**: Python
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT app:app`
-
-#### 4. Configurá las Variables de Entorno
-
-En Render, agregá estas variables (en "Environment"):
-
-| Variable | Valor |
-|----------|-------|
-| `TELEGRAM_TOKEN` | Tu token de @BotFather |
-| `GEMINI_API_KEY` | Tu API key de Gemini |
-| `MONGO_URI` | Connection string de MongoDB Atlas |
-
-#### 5. Desplegá
-
-Click en **"Create Web Service"** y esperá a que termine el build.
-
-#### 6. Configurá el Webhook
-
-Una vez deployado, vas a ver la URL de tu servicio (ej: `https://macrobot.onrender.com`).
-
-**Opción A - Automático**: El bot ya se configura solo al iniciar (líneas finales de `app.py`)
-
-**Opción B - Manual** (si no funcionó):
-```bash
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-servicio.onrender.com/<TOKEN>"
-```
-
-#### 7. Migrá los datos (una sola vez)
-
-Si tenés datos en los JSONs old, ejecutá el script de migración:
-
-```bash
-python migrate_db.py
-```
-
-## 🔄 Cambiar de PythonAnywhere a Render
-
-Cuando tu bot esté funcionando en Render:
-
-1. En tu terminal, cambiá el webhook de Telegram a la nueva URL de Render:
-   ```bash
-   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-servicio.onrender.com/<TOKEN>"
-   ```
-
-2. Desactivá el bot en PythonAnywhere (o dejalo andando como backup)
-
-3. ¡Listo! Ya no necesitás la PC prendida 🇦🇷
+- 📊 **Cálculo de Macros y Calorías** - Registrá tus comidas del día con sus macronutrientes.
+- 👤 **Perfil Personal** - Ajustá tus datos personales (peso, altura, nivel de actividad, metas) y calculá tu TDEE.
+- 🔍 **Buscador Nutricional** - Buscá alimentos en la base local o a través de Open Food Facts.
+- 📷 **Scanner de Código de Barras** - Escaneá directamente con la cámara del celular.
+- 🍳 **Sistema de Recetas** - Creá tus propias recetas compuestas y calculá sus valores por porción/100g.
+- 🧠 **IA Nutricional (Gemini)** - Consultale a Gemini ideas de comidas según tus macros o pedile que analice la información de un plato.
+- ☁️ **MongoDB / Almacenamiento Local** - Persistencia en la nube con MongoDB Atlas o fallback local en memoria/JSON.
 
 ## 🐛 Desarrollo Local
 
+### Prerrequisitos
+
+- Python 3.10+
+- (Opcional) API Key de Google Gemini en `.env`
+- (Opcional) MongoDB URI en `.env`
+
+### Pasos para ejecutar
+
 ```bash
-# Instalar dependencias
+# 1. Clonar el repositorio
+git clone https://github.com/TU_USUARIO/MacroCalculatorBot_Telegram.git
+cd MacroCalculatorBot_Telegram
+
+# 2. Instalar dependencias
 pip install -r requirements.txt
 
-# Ejecutar (usa webhook en prod, local flask server)
+# 3. Configurar variables de entorno (opcional)
+copy .env.example .env
+
+# 4. Iniciar servidor Flask
 python app.py
 ```
 
-## 📁 Estructura
+Abrí tu navegador e ingresá a `http://localhost:5000` (o `http://127.0.0.1:5000`).
+
+## 🚀 Deploy a Render (Producción)
+
+1. En Render, creá un **Web Service**.
+2. Conectá el repositorio.
+3. Configurá:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT app:app`
+4. Agregá las variables de entorno (`GEMINI_API_KEY`, `MONGO_URI`) en la pestaña **Environment**.
+
+## 📁 Estructura del Proyecto
 
 ```
-MacroBot/
-├── app.py              # Bot principal con MongoDB
-├── migrate_db.py       # Script de migración JSON → MongoDB
-├── alimentos.json      # Base de datos de alimentos
-├── requirements.txt   # Dependencias Python
-├── Dockerfile         # Para containerización
-├── Procfile           # Para Render
+MacroCalculatorBot_Telegram/
+├── app.py              # Backend Flask (REST API)
+├── templates/
+│   └── index.html      # UI Móvil Single Page Application (PWA)
+├── static/
+│   ├── js/
+│   │   └── app.js      # Lógica de la aplicación frontend
+│   └── css/
+│       └── style.css   # Estilos de la aplicación móvil
+├── alimentos.json      # Base de datos nutricional local
+├── requirements.txt   # Dependencias de Python
 └── .env.example       # Plantilla de configuración
 ```
 
-## 📝 Notas
-
-- El archivo `usuarios.json` ya no se usa — todo está en MongoDB
-- Si hay errores, revisá los logs en el dashboard de Render
-- El bot usa **webhooks** (no polling) en producción
-
 ---
 
-*Hecho con ❤️ para facilitar el tracking nutricional*
+*Hecho con ❤️ para facilitar el tracking nutricional*

@@ -16,14 +16,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
     <!-- HTML5 QR / Barcode Scanner SDK -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <!-- CSS Principal -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.0">
 </head>
 <body>
     <div id="app" class="app-container">
@@ -53,6 +50,12 @@
                 <div class="card glass-card calorie-card">
                     <div class="calorie-ring-container">
                         <svg class="calorie-ring" viewBox="0 0 160 160">
+                            <defs>
+                                <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#ff6b00" />
+                                    <stop offset="100%" stop-color="#ff8c00" />
+                                </linearGradient>
+                            </defs>
                             <circle class="ring-bg" cx="80" cy="80" r="70"></circle>
                             <circle id="calorieProgress" class="ring-fill" cx="80" cy="80" r="70"></circle>
                         </svg>
@@ -318,56 +321,12 @@
                     <h3 class="card-title"><i class="fa-solid fa-calculator text-purple"></i> Calculadora TDEE y Perfil</h3>
                     <p class="card-desc">Calculá tus necesidades calóricas exactas y distribución de macronutrientes según tu físico y objetivo.</p>
                     
-                    <form id="tdeeForm">
-                        <div class="form-row">
-                            <div class="form-group flex-1">
-                                <label for="tdeePeso">Peso (kg):</label>
-                                <input type="number" id="tdeePeso" value="70" min="30" max="250" step="0.1" required>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label for="tdeeAltura">Altura (cm):</label>
-                                <input type="number" id="tdeeAltura" value="170" min="100" max="230" required>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group flex-1">
-                                <label for="tdeeEdad">Edad (años):</label>
-                                <input type="number" id="tdeeEdad" value="25" min="12" max="100" required>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label for="tdeeSexo">Sexo biológico:</label>
-                                <select id="tdeeSexo">
-                                    <option value="m">Masculino</option>
-                                    <option value="f">Femenino</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="tdeeActividad">Nivel de Actividad:</label>
-                            <select id="tdeeActividad">
-                                <option value="sedentario">Sedentario (Poco o ningún ejercicio)</option>
-                                <option value="ligero">Ligero (Ejercicio 1-3 días/semana)</option>
-                                <option value="moderado" selected>Moderado (Ejercicio 3-5 días/semana)</option>
-                                <option value="intenso">Intenso (Ejercicio 6-7 días/semana)</option>
-                                <option value="extremo">Extremo (Trabajo físico / Atleta)</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="tdeeObjetivo">Objetivo Nutricional:</label>
-                            <select id="tdeeObjetivo">
-                                <option value="perder">Déficit (Perder grasa)</option>
-                                <option value="mantener" selected>Mantenimiento (Mantener peso)</option>
-                                <option value="ganar">Superávit (Ganar masa muscular)</option>
-                            </select>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-block">
-                            <i class="fa-solid fa-arrows-rotate"></i> Calcular y Guardar Metas
+                                        <div id="profileSummaryPanel">
+                        <p class="card-desc">Tus datos están configurados. Podés volver a hacer el cuestionario paso a paso cuando quieras.</p>
+                        <button type="button" class="btn btn-primary btn-block margin-top" onclick="openFullscreenProfileWizard()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Rehacer Perfil Paso a Paso
                         </button>
-                    </form>
+                    </div>
                 </div>
 
                 <!-- Historial de Días Anteriores -->
@@ -413,7 +372,13 @@
                 
                 <div class="form-group margin-top">
                     <label for="logQuantity">Ingresá la cantidad:</label>
-                    <div class="quantity-input-group">
+                                        <div class="drum-picker-container" id="logDrumContainer">
+                        <div class="drum-picker-highlight"></div>
+                        <ul class="drum-picker-list" id="logDrumList">
+                            <!-- JS will populate list 1 to 1000 -->
+                        </ul>
+                    </div>
+                    <div class="quantity-input-group" style="display:none;">
                         <input type="number" id="logQuantity" value="100" min="1" step="1">
                         <select id="logUnit">
                             <option value="g">Gramos (g)</option>
@@ -484,10 +449,16 @@
 
                     <div class="form-group margin-top">
                         <label for="portionGramsInput">O ingresá los gramos consumidos:</label>
-                        <div class="quantity-input-group">
-                            <input type="number" id="portionGramsInput" value="100" min="1" step="1">
-                            <span class="unit-badge">gramos</span>
-                        </div>
+                                            <div class="drum-picker-container" id="portionDrumContainer">
+                        <div class="drum-picker-highlight"></div>
+                        <ul class="drum-picker-list" id="portionDrumList">
+                            <!-- JS will populate list 1 to 1000 -->
+                        </ul>
+                    </div>
+                    <div class="quantity-input-group" style="display:none;">
+                        <input type="number" id="portionGramsInput" value="100" min="1" step="1">
+                        <span class="unit-badge">gramos</span>
+                    </div>
                     </div>
                 </div>
 
@@ -506,6 +477,78 @@
     </div>
 
     <!-- Script Principal JS -->
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=2.0"></script>
+
+        <!-- MODAL FULLSCREEN WIZARD PERFIL -->
+        <div id="profileFullscreenModal" class="modal fullscreen-modal hidden">
+            <div class="modal-content fullscreen-content">
+                <button type="button" class="close-fullscreen-btn" onclick="closeFullscreenProfileWizard()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 class="modal-title text-center"><i class="fa-solid fa-calculator text-purple"></i> Configura tu Perfil</h3>
+                
+                <div id="profileWizard" class="wizard-container fullscreen-wizard">
+                    <!-- Paso 1 -->
+                    <div class="wizard-step active" id="wizardStep1">
+                        <h4 class="wizard-step-title text-center">Paso 1: Datos Básicos</h4>
+                        <div class="form-group">
+                            <label for="tdeeSexo">Sexo biológico:</label>
+                            <select id="tdeeSexo">
+                                <option value="m">Masculino</option>
+                                <option value="f">Femenino</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tdeeEdad">Edad (años):</label>
+                            <input type="number" id="tdeeEdad" value="25" min="12" max="100" required>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-block margin-top" onclick="nextWizardStep(2)">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+
+                    <!-- Paso 2 -->
+                    <div class="wizard-step" id="wizardStep2">
+                        <h4 class="wizard-step-title text-center">Paso 2: Tus Medidas</h4>
+                        <div class="form-group">
+                            <label for="tdeePeso">Peso (kg):</label>
+                            <input type="number" id="tdeePeso" value="70" min="30" max="250" step="0.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="tdeeAltura">Altura (cm):</label>
+                            <input type="number" id="tdeeAltura" value="170" min="100" max="230" required>
+                        </div>
+                        <div class="wizard-actions margin-top">
+                            <button type="button" class="btn btn-secondary flex-1" onclick="nextWizardStep(1)"><i class="fa-solid fa-arrow-left"></i> Atrás</button>
+                            <button type="button" class="btn btn-primary flex-1" onclick="nextWizardStep(3)">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Paso 3 -->
+                    <div class="wizard-step" id="wizardStep3">
+                        <h4 class="wizard-step-title text-center">Paso 3: Actividad y Objetivo</h4>
+                        <div class="form-group">
+                            <label for="tdeeActividad">Nivel de Actividad:</label>
+                            <select id="tdeeActividad">
+                                <option value="sedentario">Sedentario (Poco o ningún ejercicio)</option>
+                                <option value="ligero">Ligero (1-3 días/semana)</option>
+                                <option value="moderado" selected>Moderado (3-5 días/semana)</option>
+                                <option value="intenso">Intenso (6-7 días/semana)</option>
+                                <option value="extremo">Extremo (Atleta)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tdeeObjetivo">Objetivo Nutricional:</label>
+                            <select id="tdeeObjetivo">
+                                <option value="perder">Déficit (Perder grasa)</option>
+                                <option value="mantener" selected>Mantenimiento (Mantener peso)</option>
+                                <option value="ganar">Superávit (Ganar masa muscular)</option>
+                            </select>
+                        </div>
+                        <div class="wizard-actions margin-top">
+                            <button type="button" class="btn btn-secondary flex-1" onclick="nextWizardStep(2)"><i class="fa-solid fa-arrow-left"></i> Atrás</button>
+                            <button type="button" class="btn btn-primary flex-1" onclick="submitProfileWizard()"><i class="fa-solid fa-check"></i> Finalizar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 </body>
 </html>

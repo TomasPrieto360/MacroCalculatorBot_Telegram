@@ -12,13 +12,6 @@ let currentFacingMode = 'environment';
 let currentLabelSubMode = 'live'; // 'live', 'photo'
 let selectedDetectedFood = null;
 
-// Inicialización de Telegram WebApp SDK (opcional si corre dentro de Telegram)
-const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.ready();
-    tg.expand();
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
     registerServiceWorker();
@@ -27,21 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
     setupEventListeners();
     await loadUsers();
-    
-    // Auto-detectar usuario de Telegram si está disponible
-    if (tg?.initDataUnsafe?.user?.id) {
-        const tgId = String(tg.initDataUnsafe.user.id);
-        const userSelect = document.getElementById('userSelect');
-        if (![...userSelect.options].some(opt => opt.value === tgId)) {
-            const newOpt = document.createElement('option');
-            newOpt.value = tgId;
-            newOpt.textContent = `Telegram: ${tg.initDataUnsafe.user.first_name || tgId}`;
-            userSelect.prepend(newOpt);
-        }
-        userSelect.value = tgId;
-        currentUser = tgId;
-    }
-
     await loadUserData();
 }
 
@@ -182,7 +160,7 @@ function renderFavorites() {
                     <p>${Math.round(item.kcal)} kcal | P: ${item.proteinas}g | C: ${item.carbos}g | G: ${item.grasas}g</p>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn btn-primary" style="padding:6px 12px; font-size:0.8rem;" onclick='logFavoriteItem(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+                    <button class="btn btn-primary" id="btn-fav-${item.nombre.replace(/\s+/g, '-')}" style="padding:6px 12px; font-size:0.8rem;" onclick='addFavoriteDirectly(${JSON.stringify(item).replace(/'/g, "&apos;")}, this)'>
                         <i class="fa-solid fa-plus"></i> Usar
                     </button>
                     <button class="delete-item-btn" onclick="deleteFavoriteItem('${item.nombre}')" title="Eliminar de favoritos">
@@ -259,6 +237,45 @@ function setupEventListeners() {
     // Refresh
     document.getElementById('btnRefresh').addEventListener('click', loadUserData);
 
+    // Sync log modal sliders
+    const logRange = document.getElementById('logQuantityRange');
+    const logInput = document.getElementById('logQuantity');
+    if(logRange && logInput) {
+        logRange.addEventListener('input', e => logInput.value = e.target.value);
+        logInput.addEventListener('input', e => logRange.value = e.target.value);
+    }
+    
+    // Sync portion modal sliders
+    const portionRange = document.getElementById('portionGramsRange');
+    const portionInput = document.getElementById('portionGramsInput');
+    if(portionRange && portionInput) {
+        portionRange.addEventListener('input', e => {
+            portionInput.value = e.target.value;
+            updatePortionPreview();
+        });
+        portionInput.addEventListener('input', e => {
+            portionRange.value = e.target.value;
+            updatePortionPreview();
+        });
+    }
+    
+    // Add Event Listener to select unit to adjust step/range dynamically
+    const logUnit = document.getElementById('logUnit');
+    if(logUnit) {
+        logUnit.addEventListener('change', (e) => {
+            if(e.target.value === 'u') {
+                logRange.max = 20;
+                logRange.step = 0.5;
+                if(logInput.value > 20) { logInput.value = 1; logRange.value = 1; }
+            } else {
+                logRange.max = 1000;
+                logRange.step = 1;
+                if(logInput.value < 10) { logInput.value = 100; logRange.value = 100; }
+            }
+        });
+    }
+
+
     // Búsqueda
     let searchTimeout;
     const searchInput = document.getElementById('searchInput');
@@ -324,31 +341,42 @@ function setupEventListeners() {
     document.getElementById('btnGenerateFridgeRecipes').addEventListener('click', generateFridgeRecipes);
 
     // Formulario TDEE
-    document.getElementById('tdeeForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const peso = parseFloat(document.getElementById('tdeePeso').value);
-        const altura = parseFloat(document.getElementById('tdeeAltura').value);
-        const edad = parseFloat(document.getElementById('tdeeEdad').value);
-        const sexo = document.getElementById('tdeeSexo').value;
-        const actividad = document.getElementById('tdeeActividad').value;
-        const objetivo = document.getElementById('tdeeObjetivo').value;
-
-        try {
-            const res = await fetch(`/api/user/${currentUser}/calculate-tdee`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ peso, altura, edad, sexo, actividad, objetivo })
-            });
-            const data = await res.json();
-            if (data.status === 'ok') {
-                alert(`¡Metas recalculadas!\nMeta Calorías: ${data.meta_kcal} kcal\nProteínas: ${data.meta_proteinas}g`);
-                await loadUserData();
-            }
-        } catch (e) {
-            alert('Error calculando TDEE');
-        }
-    });
+    // Setup Event Listeners end
 }
+
+// Wizard Profile Functions
+function nextWizardStep(step) {
+    document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+    document.getElementById(`wizardStep${step}`).classList.add('active');
+}
+
+async function submitProfileWizard() {
+    const peso = parseFloat(document.getElementById('tdeePeso').value);
+    const altura = parseFloat(document.getElementById('tdeeAltura').value);
+    const edad = parseFloat(document.getElementById('tdeeEdad').value);
+    const sexo = document.getElementById('tdeeSexo').value;
+    const actividad = document.getElementById('tdeeActividad').value;
+    const objetivo = document.getElementById('tdeeObjetivo').value;
+
+    try {
+        const res = await fetch(`/api/user/${currentUser}/calculate-tdee`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ peso, altura, edad, sexo, actividad, objetivo })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            alert(`¡Metas recalculadas!
+Meta Calorías: ${data.meta_kcal} kcal
+Proteínas: ${data.meta_proteinas}g`);
+            await loadUserData();
+            switchTab('tab-dashboard');
+        }
+    } catch (e) {
+        alert('Error calculando metas de perfil');
+    }
+}
+
 
 // Búsqueda en API
 async function performSearch(query) {
@@ -563,30 +591,14 @@ async function switchCameraFacing() {
 }
 
 async function startLiveScanner() {
-    // 1. Si la app se ejecuta en un celular dentro de Telegram, usar el ESCÁNER NATIVO DE CÁMARA DE TELEGRAM
-    if (tg && typeof tg.showScanQr === 'function') {
-        try {
-            tg.showScanQr({ text: 'Apuntá al código de barras o QR del producto' }, (text) => {
-                if (text) {
-                    tg.closeScanQr();
-                    onBarcodeScanned(text);
-                }
-                return true;
-            });
-            return;
-        } catch (err) {
-            console.warn('Fallback a cámara web HTML5:', err);
-        }
-    }
-
-    // 2. Para navegadores web móviles fuera de Telegram
     if (typeof Html5Qrcode === 'undefined') {
         alert('Cargando motor de cámara... Intentá de nuevo en un segundo.');
         return;
     }
 
     const btnToggle = document.getElementById('btnToggleCamera');
-    btnToggle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
+    btnToggle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Solicitando Cámara...';
+    btnToggle.disabled = true;
 
     try {
         if (!html5QrcodeScanner) {
@@ -610,12 +622,15 @@ async function startLiveScanner() {
         btnToggle.classList.remove('btn-primary');
         btnToggle.classList.add('btn-secondary');
         btnToggle.innerHTML = '<i class="fa-solid fa-video-slash"></i> Detener Cámara';
+        btnToggle.disabled = false;
     } catch (e) {
         console.error('Error al iniciar cámara:', e);
         btnToggle.classList.remove('btn-secondary');
         btnToggle.classList.add('btn-primary');
         btnToggle.innerHTML = '<i class="fa-solid fa-video"></i> Iniciar Cámara';
+        btnToggle.disabled = false;
         isCameraRunning = false;
+        alert('No se pudo acceder a la cámara. Asegurate de dar los permisos.');
     }
 }
 
@@ -931,8 +946,10 @@ async function logAiResult() {
         document.getElementById('aiResultBox').classList.add('hidden');
         currentAiParsedFood = null;
         await loadUserData();
-        switchTab('tab-dashboard');
+        if(btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> Agregado'; setTimeout(()=> { btn.disabled = false; switchTab('tab-dashboard'); }, 500); }
+        else { switchTab('tab-dashboard'); }
     } catch (e) {
+        if(btn) { btn.innerHTML = 'Agregar'; btn.disabled = false; }
         alert('Error guardando resultado IA');
     }
 }
@@ -966,7 +983,8 @@ async function logFavoriteItem(item) {
         kcal: item.kcal,
         proteinas: item.proteinas,
         carbos: item.carbos,
-        grasas: item.grasas
+        grasas: item.grasas,
+        is_favorite: true
     });
 }
 
@@ -1012,7 +1030,7 @@ async function generateFridgeRecipes() {
                     <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">${rec.instrucciones}</p>
                     <div style="display:flex; justify-content:space-between; width:100%; align-items:center; margin-top:6px; border-top:1px dashed var(--bg-card-border); padding-top:6px;">
                         <span style="font-size:0.8rem; color:var(--text-secondary);">P: ${rec.proteinas}g | C: ${rec.carbos}g | G: ${rec.grasas}g</span>
-                        <button class="btn btn-success" style="padding:6px 12px; font-size:0.8rem;" onclick='openLogModal(${JSON.stringify({alimento: rec.titulo, kcal: rec.kcal, proteinas: rec.proteinas, carbos: rec.carbos, grasas: rec.grasas}).replace(/'/g, "&apos;")})'>
+                        <button class="btn btn-success" style="padding:6px 12px; font-size:0.8rem;" onclick='addFavoriteDirectly(${JSON.stringify({nombre: rec.titulo, kcal: rec.kcal, proteinas: rec.proteinas, carbos: rec.carbos, grasas: rec.grasas}).replace(/'/g, "&apos;")}, this)'>
                             <i class="fa-solid fa-plus"></i> Usar Receta
                         </button>
                     </div>
@@ -1064,3 +1082,127 @@ function registerServiceWorker() {
         navigator.serviceWorker.register('/static/sw.js').catch(err => console.log('SW Note:', err));
     }
 }
+
+// ----------------- DRUM PICKER LOGIC -----------------
+let drumTimeout;
+function initDrumPicker(listId, inputId, maxVal) {
+    const list = document.getElementById(listId);
+    const input = document.getElementById(inputId);
+    if(!list || !input) return;
+    
+    list.innerHTML = '';
+    for(let i = 1; i <= maxVal; i++) {
+        const li = document.createElement('li');
+        li.textContent = i;
+        li.dataset.val = i;
+        list.appendChild(li);
+    }
+    
+    let prevIndex = -1;
+    list.addEventListener('scroll', () => {
+        clearTimeout(drumTimeout);
+        drumTimeout = setTimeout(() => {
+            let index = Math.round(list.scrollTop / 50);
+            if(index < 0) index = 0;
+            if(index >= maxVal) index = maxVal - 1;
+            
+            if(index !== prevIndex) {
+                const items = list.querySelectorAll('li');
+                if(prevIndex >= 0 && items[prevIndex]) items[prevIndex].classList.remove('active');
+                if(items[index]) {
+                    items[index].classList.add('active');
+                    input.value = items[index].dataset.val;
+                    if(typeof updatePortionPreview === 'function') updatePortionPreview();
+                }
+                prevIndex = index;
+            }
+        }, 30);
+    });
+}
+
+function scrollToDrumValue(listId, val) {
+    const list = document.getElementById(listId);
+    if(!list) return;
+    const items = list.querySelectorAll('li');
+    let target = null;
+    items.forEach(item => {
+        item.classList.remove('active');
+        if(item.dataset.val == val) target = item;
+    });
+    if(target) {
+        target.classList.add('active');
+        list.scrollTop = target.offsetTop - (list.clientHeight / 2) + (target.clientHeight / 2);
+    }
+}
+
+// ----------------- FAVORITOS DIRECTOS -----------------
+async function addFavoriteDirectly(item, btnElement) {
+    const originalHtml = btnElement.innerHTML;
+    btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btnElement.disabled = true;
+    
+    try {
+        await fetch(`/api/user/${currentUser}/log`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                alimento: item.nombre,
+                cantidad: 1,
+                unidad: 'u',
+                stats: { ...item, peso_unidad: 100 }
+            })
+        });
+        
+        btnElement.innerHTML = '<i class="fa-solid fa-check"></i>';
+        btnElement.classList.replace('btn-primary', 'btn-success');
+        if (typeof tg !== 'undefined' && tg) tg.HapticFeedback?.notificationOccurred('success');
+        
+        setTimeout(() => {
+            btnElement.innerHTML = originalHtml;
+            btnElement.classList.replace('btn-success', 'btn-primary');
+            btnElement.disabled = false;
+            loadUserData();
+            switchTab('tab-dashboard');
+        }, 800);
+        
+    } catch (e) {
+        alert('Error al registrar favorito directamente');
+        btnElement.innerHTML = originalHtml;
+        btnElement.disabled = false;
+    }
+}
+
+// ----------------- WIZARD FULLSCREEN -----------------
+function openFullscreenProfileWizard() {
+    document.getElementById('profileFullscreenModal').classList.remove('hidden');
+    nextWizardStep(1);
+}
+
+function closeFullscreenProfileWizard() {
+    document.getElementById('profileFullscreenModal').classList.add('hidden');
+}
+
+// Inject into openLogModal
+const originalOpenLogModal = openLogModal;
+window.openLogModal = function(food) {
+    originalOpenLogModal(food);
+    const input = document.getElementById('logQuantity');
+    initDrumPicker('logDrumList', 'logQuantity', 1000);
+    setTimeout(() => {
+        scrollToDrumValue('logDrumList', input.value);
+    }, 100);
+};
+
+
+// Inject into setPortionGrams
+const originalSetPortionGrams = setPortionGrams;
+window.setPortionGrams = function(grams) {
+    originalSetPortionGrams(grams);
+    scrollToDrumValue('portionDrumList', grams);
+};
+
+// Initialize portion drum when portionModal is opened
+// portion modal is opened in app.js on lines where portionModal is shown. We can just init it on load.
+document.addEventListener("DOMContentLoaded", () => {
+    initDrumPicker('portionDrumList', 'portionGramsInput', 1000);
+});
