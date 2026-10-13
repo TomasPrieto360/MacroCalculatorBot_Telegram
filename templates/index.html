@@ -31,6 +31,9 @@
                 <select id="userSelect" class="user-select">
                     <option value="default">Cargando perfil...</option>
                 </select>
+                <button id="btnAddUser" class="icon-btn" title="Crear nuevo usuario" onclick="openNewUserModal()" style="margin-left:4px; color: var(--color-orange);">
+                    <i class="fa-solid fa-user-plus"></i>
+                </button>
             </div>
             <div class="header-actions">
                 <div id="streakBadge" class="streak-pill" title="Racha de días cumplidos">
@@ -78,37 +81,88 @@
                     </div>
                 </div>
 
-                <!-- Barras de Macros (Proteínas, Carbos, Grasas) -->
-                <div class="card glass-card macros-card">
-                    <h3 class="card-title"><i class="fa-solid fa-chart-pie text-cyan"></i> Distribución de Macros</h3>
-                    
-                    <div class="macro-bar-container">
-                        <div class="macro-info">
-                            <span class="macro-name"><i class="fa-solid fa-drumstick-bite text-blue"></i> Proteínas</span>
-                            <span class="macro-val"><strong id="protCurrent">0</strong> / <span id="protGoal">160</span>g</span>
-                        </div>
-                        <div class="progress-track">
-                            <div id="protBar" class="progress-fill fill-blue" style="width: 0%;"></div>
-                        </div>
-                    </div>
-
-                    <div class="macro-bar-container">
-                        <div class="macro-info">
-                            <span class="macro-name"><i class="fa-solid fa-wheat-awn text-green"></i> Carbohidratos</span>
-                            <span class="macro-val"><strong id="carbCurrent">0</strong> / <span id="carbGoal">250</span>g</span>
-                        </div>
-                        <div class="progress-track">
-                            <div id="carbBar" class="progress-fill fill-green" style="width: 0%;"></div>
+                <!-- Barras de Macros (Rings) -->
+                <div class="macros-rings-grid margin-top">
+                    <div class="macro-ring-card blue">
+                        <svg class="mini-ring" viewBox="0 0 60 60">
+                            <circle class="ring-bg" cx="30" cy="30" r="26"></circle>
+                            <circle id="protRing" class="ring-fill" cx="30" cy="30" r="26"></circle>
+                        </svg>
+                        <div class="macro-ring-info">
+                            <span class="m-name">Proteínas</span>
+                            <span class="m-val"><strong id="protCurrent">0</strong>/<span id="protGoal">160</span>g</span>
                         </div>
                     </div>
-
-                    <div class="macro-bar-container">
-                        <div class="macro-info">
-                            <span class="macro-name"><i class="fa-solid fa-droplet text-purple"></i> Grasas</span>
-                            <span class="macro-val"><strong id="fatCurrent">0</strong> / <span id="fatGoal">65</span>g</span>
+                    <div class="macro-ring-card green">
+                        <svg class="mini-ring" viewBox="0 0 60 60">
+                            <circle class="ring-bg" cx="30" cy="30" r="26"></circle>
+                            <circle id="carbRing" class="ring-fill" cx="30" cy="30" r="26"></circle>
+                        </svg>
+                        <div class="macro-ring-info">
+                            <span class="m-name">Carbos</span>
+                            <span class="m-val"><strong id="carbCurrent">0</strong>/<span id="carbGoal">250</span>g</span>
                         </div>
-                        <div class="progress-track">
-                            <div id="fatBar" class="progress-fill fill-purple" style="width: 0%;"></div>
+                    </div>
+                    <div class="macro-ring-card purple">
+                        <svg class="mini-ring" viewBox="0 0 60 60">
+                            <circle class="ring-bg" cx="30" cy="30" r="26"></circle>
+                            <circle id="fatRing" class="ring-fill" cx="30" cy="30" r="26"></circle>
+                        </svg>
+                        <div class="macro-ring-info">
+                            <span class="m-name">Grasas</span>
+                            <span class="m-val"><strong id="fatCurrent">0</strong>/<span id="fatGoal">65</span>g</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Distribución de Comidas -->
+                <div class="card glass-card meal-distribution-card margin-top">
+                    <h3 class="card-title"><i class="fa-solid fa-utensils text-orange"></i> Comidas de Hoy</h3>
+                    <div class="meals-grid">
+                        <div class="meal-slot" onclick="switchTab('tab-search')">
+                            <button class="meal-add-btn"><i class="fa-solid fa-plus"></i></button>
+                            <span class="meal-name">Desayuno</span>
+                            <span class="meal-cals">0 kcal</span>
+                        </div>
+                        <div class="meal-slot" onclick="switchTab('tab-search')">
+                            <button class="meal-add-btn"><i class="fa-solid fa-plus"></i></button>
+                            <span class="meal-name">Almuerzo</span>
+                            <span class="meal-cals">0 kcal</span>
+                        </div>
+                        <div class="meal-slot" onclick="switchTab('tab-search')">
+                            <button class="meal-add-btn"><i class="fa-solid fa-plus"></i></button>
+                            <span class="meal-name">Cena</span>
+                            <span class="meal-cals">0 kcal</span>
+                        </div>
+                        <div class="meal-slot" onclick="switchTab('tab-search')">
+                            <button class="meal-add-btn"><i class="fa-solid fa-plus"></i></button>
+                            <span class="meal-name">Snacks</span>
+                            <span class="meal-cals">0 kcal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Micro-Tracker (Fibra, Azúcar, Sodio) -->
+                <div class="micro-tracker-grid margin-top">
+                    <div class="micro-card">
+                        <i class="fa-solid fa-leaf text-green"></i>
+                        <div class="micro-data">
+                            <span class="micro-name">Fibra</span>
+                            <span class="micro-val"><strong>0</strong> / 25g</span>
+                        </div>
+                    </div>
+                    <div class="micro-card">
+                        <i class="fa-solid fa-cube text-blue"></i>
+                        <div class="micro-data">
+                            <span class="micro-name">Azúcar</span>
+                            <span class="micro-val"><strong>0</strong> / 50g</span>
+                        </div>
+                    </div>
+                    <div class="micro-card">
+                        <i class="fa-solid fa-salt-shaker text-purple"></i>
+                        <div class="micro-data">
+                            <span class="micro-name">Sodio</span>
+                            <span class="micro-val"><strong>0</strong> / 2.3g</span>
                         </div>
                     </div>
                 </div>
@@ -138,6 +192,35 @@
                         <i class="fa-solid fa-utensils text-green"></i>
                         <span>IA Heladera</span>
                     </button>
+                </div>
+
+                <!-- MÓDULOS AVANZADOS: Agua y Ayuno -->
+                <div class="advanced-modules-grid margin-top">
+                    <!-- Tracker de Agua -->
+                    <div class="card glass-card water-tracker-card">
+                        <div class="water-header">
+                            <h4 class="card-title"><i class="fa-solid fa-droplet text-blue"></i> Hidratación</h4>
+                            <span class="water-goal"><strong id="waterCurrent">0</strong> / 2000 ml</span>
+                        </div>
+                        <div class="water-glasses" id="waterGlassesContainer">
+                            <!-- Glasses generated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Temporizador de Ayuno -->
+                    <div class="card glass-card fasting-timer-card">
+                        <div class="fasting-header">
+                            <h4 class="card-title"><i class="fa-solid fa-stopwatch text-orange"></i> Ayuno (16:8)</h4>
+                            <span class="fasting-status eating" id="fastingStatusBadge">Comiendo</span>
+                        </div>
+                        <div class="fasting-clock">
+                            <div class="clock-ring">
+                                <span class="clock-time" id="fastingTimerDisplay">00:00:00</span>
+                                <span class="clock-label" id="fastingLabelDisplay">Tiempo Transcurrido</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary fasting-btn w-100 margin-top-sm" id="btnToggleFasting" onclick="toggleFasting()">Iniciar Ayuno</button>
+                    </div>
                 </div>
             </section>
 
@@ -470,6 +553,29 @@
                     <button id="btnCancelPortion" class="btn btn-secondary">Cancelar</button>
                     <button id="btnSavePortionFav" class="btn btn-outline" title="Guardar a Favoritos"><i class="fa-solid fa-star text-gold"></i></button>
                     <button id="btnConfirmPortionLog" class="btn btn-success flex-1"><i class="fa-solid fa-check"></i> Registrar en el Día</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: NUEVO USUARIO -->
+        <div id="newUserModal" class="modal hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-icon-header">
+                    <i class="fa-solid fa-user-plus text-orange"></i>
+                </div>
+                <h3 class="modal-title">Crear Nuevo Perfil</h3>
+                <p class="modal-subtitle" style="text-align:center;">Cada perfil tiene sus propios datos, historial y metas. La info no se comparte entre perfiles.</p>
+
+                <div class="form-group margin-top">
+                    <label for="newUserName"><i class="fa-solid fa-signature"></i> Nombre del nuevo usuario:</label>
+                    <input type="text" id="newUserName" placeholder="Ej: Marcos, Ana, Papá..." maxlength="30" style="margin-top:6px;">
+                </div>
+
+                <div class="modal-actions margin-top">
+                    <button id="btnCancelNewUser" class="btn btn-secondary flex-1">Cancelar</button>
+                    <button id="btnConfirmNewUser" class="btn btn-primary flex-1">
+                        <i class="fa-solid fa-check"></i> Crear Perfil
+                    </button>
                 </div>
             </div>
         </div>

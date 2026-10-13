@@ -41,12 +41,59 @@ async function loadUsers() {
                 userSelect.appendChild(opt);
             });
         }
+
+        // Restaurar el último usuario seleccionado desde localStorage
+        const savedUser = localStorage.getItem('macrobot_active_user');
+        if (savedUser && userSelect.querySelector(`option[value="${savedUser}"]`)) {
+            userSelect.value = savedUser;
+        }
         currentUser = userSelect.value || 'defecto';
     } catch (e) {
         console.error('Error cargando usuarios:', e);
         const userSelect = document.getElementById('userSelect');
         userSelect.innerHTML = '<option value="defecto">Usuario Principal</option>';
         currentUser = 'defecto';
+    }
+}
+
+// --- NUEVO USUARIO ---
+function openNewUserModal() {
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('newUserName').focus(), 100);
+}
+
+function closeNewUserModal() {
+    document.getElementById('newUserModal').classList.add('hidden');
+}
+
+async function confirmCreateUser() {
+    const nombre = document.getElementById('newUserName').value.trim();
+    if (!nombre) {
+        alert('Por favor ingresá un nombre para el nuevo perfil.');
+        return;
+    }
+    try {
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            closeNewUserModal();
+            // Cambiar al nuevo usuario
+            currentUser = data.user_id;
+            localStorage.setItem('macrobot_active_user', currentUser);
+            await loadUsers();
+            document.getElementById('userSelect').value = currentUser;
+            await loadUserData();
+            alert(`✅ Perfil "${data.nombre}" creado correctamente.\nAhora estás en el perfil de ${data.nombre}.`);
+        } else {
+            alert(data.message || 'Error al crear el perfil');
+        }
+    } catch (e) {
+        alert('Error de red al crear el perfil');
     }
 }
 
@@ -93,19 +140,22 @@ function renderDashboard() {
     const protGoal = currentUserData.meta_proteinas || 160;
     document.getElementById('protCurrent').textContent = protCurrent.toFixed(1);
     document.getElementById('protGoal').textContent = protGoal;
-    document.getElementById('protBar').style.width = `${Math.min(100, (protCurrent / protGoal) * 100)}%`;
+    const protPct = Math.min(100, (protCurrent / protGoal) * 100);
+    document.getElementById('protRing').style.strokeDashoffset = 164 - (164 * protPct) / 100;
 
     const carbCurrent = currentUserData.carbos || 0;
     const carbGoal = currentUserData.meta_carbos || 250;
     document.getElementById('carbCurrent').textContent = carbCurrent.toFixed(1);
     document.getElementById('carbGoal').textContent = carbGoal;
-    document.getElementById('carbBar').style.width = `${Math.min(100, (carbCurrent / carbGoal) * 100)}%`;
+    const carbPct = Math.min(100, (carbCurrent / carbGoal) * 100);
+    document.getElementById('carbRing').style.strokeDashoffset = 164 - (164 * carbPct) / 100;
 
     const fatCurrent = currentUserData.grasas || 0;
     const fatGoal = currentUserData.meta_grasas || 65;
     document.getElementById('fatCurrent').textContent = fatCurrent.toFixed(1);
     document.getElementById('fatGoal').textContent = fatGoal;
-    document.getElementById('fatBar').style.width = `${Math.min(100, (fatCurrent / fatGoal) * 100)}%`;
+    const fatPct = Math.min(100, (fatCurrent / fatGoal) * 100);
+    document.getElementById('fatRing').style.strokeDashoffset = 164 - (164 * fatPct) / 100;
 }
 
 // Renderizar Historial de Hoy
@@ -122,17 +172,28 @@ function renderHistory() {
     }
 
     list.innerHTML = history.map(item => `
-        <div class="history-item">
-            <div class="history-item-left">
-                <h4 style="text-transform: capitalize;">${item.alimento}</h4>
-                <p>${item.cantidad_str} • P: ${(item.proteinas||0).toFixed(1)}g | C: ${(item.carbos||0).toFixed(1)}g | G: ${(item.grasas||0).toFixed(1)}g</p>
+        <div class="history-item" ${item.detalle_ia ? 'style="cursor: pointer;" onclick="const p = this.querySelector(\'.ia-detail-panel\'); if(p) p.style.display = p.style.display === \'none\' ? \'block\' : \'none\';"' : ''}>
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <div class="history-item-left">
+                    <h4 style="text-transform: capitalize;">
+                        ${item.alimento}
+                        ${item.detalle_ia ? '<i class="fa-solid fa-wand-magic-sparkles text-purple" title="Analizado con IA" style="font-size:0.8rem; margin-left:5px;"></i>' : ''}
+                    </h4>
+                    <p>${item.cantidad_str} • P: ${(item.proteinas||0).toFixed(1)}g | C: ${(item.carbos||0).toFixed(1)}g | G: ${(item.grasas||0).toFixed(1)}g</p>
+                </div>
+                <div class="history-item-right" style="display:flex; align-items:center; gap:10px;">
+                    <span class="history-kcal" style="font-weight:700; color:var(--color-orange);">${Math.round(item.kcal)} kcal</span>
+                    <button class="delete-item-btn" onclick="event.stopPropagation(); deleteHistoryItem('${item.id}')" title="Eliminar">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
             </div>
-            <div class="history-item-right" style="display:flex; align-items:center; gap:10px;">
-                <span class="history-kcal" style="font-weight:700; color:var(--color-orange);">${Math.round(item.kcal)} kcal</span>
-                <button class="delete-item-btn" onclick="deleteHistoryItem('${item.id}')" title="Eliminar">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
+            ${item.detalle_ia ? `
+            <div class="ia-detail-panel" style="display:none; margin-top:12px; padding:12px; background:rgba(128,90,213,0.08); border-radius:8px; font-size:0.85rem; color:var(--text-secondary); line-height:1.4;">
+                <strong style="color:var(--primary-purple);"><i class="fa-solid fa-robot"></i> Desglose estimado por IA:</strong><br>
+                ${item.detalle_ia}
             </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -203,6 +264,9 @@ function renderPastDaysHistory() {
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
                 <span class="badge ${day.cumplido ? 'badge-success' : ''}">${day.cumplido ? '✅ Meta Cumplida' : '📊 Cerrado'}</span>
+                <button class="delete-item-btn" onclick="editHistoryDayDate('${day.fecha}')" title="Editar Fecha" style="color:var(--text-secondary);">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
                 <button class="delete-item-btn" onclick="deleteHistoryDay('${day.fecha}')" title="Eliminar registro de esta fecha">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
@@ -226,16 +290,51 @@ async function deleteHistoryDay(fecha) {
     }
 }
 
+async function editHistoryDayDate(fecha) {
+    const nuevaFecha = prompt(`Editar la fecha para el registro ${fecha}:\n(Formato YYYY-MM-DD)`, fecha);
+    if (!nuevaFecha || nuevaFecha === fecha) return;
+    
+    // Validate format YYYY-MM-DD simple regex
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nuevaFecha)) {
+        alert("El formato debe ser YYYY-MM-DD. Ejemplo: 2023-12-31");
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/api/user/${currentUser}/history-day/${fecha}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nueva_fecha: nuevaFecha })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            await loadUserData();
+        } else {
+            alert(data.message || 'Error al modificar fecha');
+        }
+    } catch (e) {
+        alert('Error de red al modificar fecha');
+    }
+}
+
 // Setup Event Listeners
 function setupEventListeners() {
-    // Selector Usuario
+    // Selector Usuario - guarda la preferencia en localStorage
     document.getElementById('userSelect').addEventListener('change', (e) => {
         currentUser = e.target.value;
+        localStorage.setItem('macrobot_active_user', currentUser);
         loadUserData();
     });
 
     // Refresh
     document.getElementById('btnRefresh').addEventListener('click', loadUserData);
+
+    // Modal Nuevo Usuario
+    document.getElementById('btnCancelNewUser').addEventListener('click', closeNewUserModal);
+    document.getElementById('btnConfirmNewUser').addEventListener('click', confirmCreateUser);
+    document.getElementById('newUserName').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmCreateUser();
+    });
 
     // Sync log modal sliders
     const logRange = document.getElementById('logQuantityRange');
@@ -433,8 +532,15 @@ function updateLivePreview() {
     const fat = ((selectedFoodForLog.grasas || 0) * grams) / 100;
 
     document.getElementById('modalLivePreview').innerHTML = `
-        ⚡ Total a registrar: <strong>${Math.round(kcal)} kcal</strong><br>
-        🥩 Proteínas: <strong>${prot.toFixed(1)}g</strong> | 🌾 Carbos: <strong>${carb.toFixed(1)}g</strong> | 🥑 Grasas: <strong>${fat.toFixed(1)}g</strong>
+        <div class="preview-summary-chip">
+            <span class="preview-label">⚡ Total a registrar</span>
+            <span class="preview-value text-orange">${Math.round(kcal)} kcal</span>
+        </div>
+        <div class="preview-macros-grid">
+            <div class="macro-chip blue"><span>🥩 Prot</span><strong>${prot.toFixed(1)}g</strong></div>
+            <div class="macro-chip green"><span>🌾 Carb</span><strong>${carb.toFixed(1)}g</strong></div>
+            <div class="macro-chip purple"><span>🥑 Grasas</span><strong>${fat.toFixed(1)}g</strong></div>
+        </div>
     `;
 }
 
@@ -757,8 +863,15 @@ function updatePortionPreview() {
     const totalG = ((g100 * grams) / 100).toFixed(1);
 
     document.getElementById('portionLivePreview').innerHTML = `
-        ⚡ Consumo calculado (<strong>${grams}g</strong>): <strong class="text-orange" style="font-size:1.1rem;">${totalKcal} kcal</strong><br>
-        🥩 Proteínas: <strong>${totalP}g</strong> | 🌾 Carbos: <strong>${totalC}g</strong> | 🥑 Grasas: <strong>${totalG}g</strong>
+        <div class="preview-summary-chip">
+            <span class="preview-label">⚡ Consumo calculado (${grams}g)</span>
+            <span class="preview-value text-orange">${totalKcal} kcal</span>
+        </div>
+        <div class="preview-macros-grid">
+            <div class="macro-chip blue"><span>🥩 Prot</span><strong>${totalP}g</strong></div>
+            <div class="macro-chip green"><span>🌾 Carb</span><strong>${totalC}g</strong></div>
+            <div class="macro-chip purple"><span>🥑 Grasas</span><strong>${totalG}g</strong></div>
+        </div>
     `;
 }
 
@@ -1192,6 +1305,87 @@ window.openLogModal = function(food) {
         scrollToDrumValue('logDrumList', input.value);
     }, 100);
 };
+
+/* ==========================================================================
+   ADVANCED MODULES: WATER & FASTING
+   ========================================================================== */
+// WATER TRACKER
+let currentWater = 0;
+const waterGoal = 2000;
+const glassSize = 250;
+const numGlasses = Math.ceil(waterGoal / glassSize);
+
+function initWaterTracker() {
+    const container = document.getElementById('waterGlassesContainer');
+    if(!container) return;
+    container.innerHTML = '';
+    for(let i=0; i<numGlasses; i++) {
+        container.innerHTML += `<button class="water-glass-btn" onclick="addWater(${glassSize}, this)"><i class="fa-solid fa-glass-water"></i></button>`;
+    }
+}
+
+function addWater(amount, btnElement) {
+    if(btnElement.classList.contains('active')) {
+        currentWater -= amount;
+        btnElement.classList.remove('active');
+    } else {
+        currentWater += amount;
+        btnElement.classList.add('active');
+    }
+    document.getElementById('waterCurrent').textContent = currentWater;
+}
+
+// FASTING TIMER
+let isFasting = false;
+let fastingStartTime = null;
+let fastingTimerInterval = null;
+
+function toggleFasting() {
+    const btn = document.getElementById('btnToggleFasting');
+    const badge = document.getElementById('fastingStatusBadge');
+    const ring = document.querySelector('.clock-ring');
+    const label = document.getElementById('fastingLabelDisplay');
+
+    if(isFasting) {
+        // Stop fasting
+        isFasting = false;
+        clearInterval(fastingTimerInterval);
+        btn.textContent = 'Iniciar Ayuno';
+        badge.textContent = 'Comiendo';
+        badge.className = 'fasting-status eating';
+        ring.classList.remove('active-fasting');
+        document.getElementById('fastingTimerDisplay').textContent = '00:00:00';
+        label.textContent = 'Tiempo Transcurrido';
+    } else {
+        // Start fasting
+        isFasting = true;
+        fastingStartTime = new Date();
+        btn.textContent = 'Finalizar Ayuno';
+        badge.textContent = 'Ayunando';
+        badge.className = 'fasting-status fasting';
+        ring.classList.add('active-fasting');
+        label.textContent = 'Tiempo de Ayuno';
+        
+        fastingTimerInterval = setInterval(updateFastingTimer, 1000);
+    }
+}
+
+function updateFastingTimer() {
+    const now = new Date();
+    const diff = Math.floor((now - fastingStartTime) / 1000); // seconds
+    
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    
+    document.getElementById('fastingTimerDisplay').textContent = 
+        `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    initWaterTracker();
+});
 
 
 // Inject into setPortionGrams

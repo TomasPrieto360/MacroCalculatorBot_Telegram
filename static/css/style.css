@@ -1,4 +1,148 @@
 /* ==========================================================================
+   ADVANCED MODULES: DASHBOARD RINGS & MEALS
+   ========================================================================== */
+.macros-rings-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+.macro-ring-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid var(--bg-card-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+.mini-ring {
+    width: 60px;
+    height: 60px;
+    transform: rotate(-90deg);
+    margin-bottom: 8px;
+}
+.mini-ring .ring-bg {
+    fill: none;
+    stroke: rgba(0,0,0,0.05);
+    stroke-width: 6;
+}
+.mini-ring .ring-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 164;
+    stroke-dashoffset: 164;
+    transition: stroke-dashoffset 1s ease-out;
+}
+.macro-ring-card.blue .ring-fill { stroke: var(--primary-blue); }
+.macro-ring-card.green .ring-fill { stroke: var(--primary-green); }
+.macro-ring-card.purple .ring-fill { stroke: var(--primary-purple); }
+
+.macro-ring-info {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+.m-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+.m-val {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+.m-val strong {
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+/* Meals Grid */
+.meals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+}
+.meal-slot {
+    background: rgba(0,0,0,0.02);
+    border: 1px dashed var(--bg-card-border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.meal-slot:hover {
+    background: rgba(255, 107, 0, 0.05);
+    border-color: rgba(255, 107, 0, 0.3);
+}
+.meal-add-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid var(--bg-card-border);
+    color: var(--primary-orange);
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.meal-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.meal-cals {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Micro Tracker */
+.micro-tracker-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.micro-card {
+    background: #fff;
+    border: 1px solid var(--bg-card-border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.micro-card i {
+    font-size: 1.4rem;
+}
+.micro-data {
+    display: flex;
+    flex-direction: column;
+}
+.micro-name {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+.micro-val {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+.micro-val strong {
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+/* ==========================================================================
    MACRO CALCULATOR APP - DESIGN SYSTEM (CLEAN LIGHT FITNESS THEME)
    Built with frontend-design guidelines: intentional typography, rich color,
    glassmorphism, subtle micro-interactions & touch-first ergonomics.
@@ -228,6 +372,123 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* ==========================================================================
+   ADVANCED MODULES: WATER & FASTING
+   ========================================================================== */
+.advanced-modules-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.margin-top {
+    margin-top: 16px;
+}
+.margin-top-sm {
+    margin-top: 10px;
+}
+.water-header, .fasting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.water-goal {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.water-goal strong {
+    color: var(--primary-blue);
+    font-size: 1.1rem;
+}
+.water-glasses {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+}
+.water-glass-btn {
+    flex: 1;
+    background: rgba(0,0,0,0.03);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 0;
+    color: #cbd5e1;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.water-glass-btn.active {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-blue);
+    transform: scale(1.05);
+}
+.fasting-status {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.fasting-status.eating {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+}
+.fasting-status.fasting {
+    background: rgba(255, 107, 0, 0.15);
+    color: var(--primary-orange);
+}
+.fasting-clock {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+}
+.clock-ring {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 6px solid rgba(255, 107, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.02);
+    transition: border-color 0.3s ease;
+}
+.clock-ring.active-fasting {
+    border-color: var(--primary-orange);
+    box-shadow: 0 0 15px rgba(255, 107, 0, 0.3);
+}
+.clock-time {
+    font-size: 1.8rem;
+    font-weight: 800;
+    font-family: 'Courier New', monospace;
+    color: var(--text-primary);
+}
+.clock-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.modal-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    line-height: 1.2;
+    text-transform: capitalize;
+}
+
+.modal-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.4;
+}
+
+.form-group.margin-top {
+    margin-top: 24px;
+}
 /* ==========================================================================
    DASHBOARD - HERO CALORIE RING & MACROS
    ========================================================================== */
@@ -1071,12 +1332,58 @@ body {
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     background: #fff;
     border-top: 1px solid var(--bg-card-border-light);
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 500px) {
     .modal-content {
         border-radius: var(--radius-xl);
     }
+}
+
+.preview-summary-chip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255,107,0,0.2);
+}
+.preview-summary-chip .preview-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+.preview-summary-chip .preview-value {
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+.preview-macros-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.macro-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+.macro-chip span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.macro-chip strong {
+    font-size: 0.9rem;
+    color: var(--text-primary);
 }
 
 @keyframes slideUp {
@@ -1200,80 +1507,79 @@ body {
     color: var(--text-secondary);
 }
 
- 
- / *   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
-       W I Z A R D   &   S L I D E R   S T Y L E S 
-       = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =   * / 
- . w i z a r d - c o n t a i n e r   { 
-         p o s i t i o n :   r e l a t i v e ; 
-         o v e r f l o w :   h i d d e n ; 
-         m i n - h e i g h t :   2 5 0 p x ; 
- } 
- 
- . w i z a r d - s t e p   { 
-         d i s p l a y :   n o n e ; 
-         a n i m a t i o n :   s l i d e I n R i g h t   0 . 3 s   c u b i c - b e z i e r ( 0 . 1 6 ,   1 ,   0 . 3 ,   1 ) ; 
- } 
- 
- . w i z a r d - s t e p . a c t i v e   { 
-         d i s p l a y :   b l o c k ; 
- } 
- 
- . w i z a r d - s t e p - t i t l e   { 
-         f o n t - s i z e :   1 . 1 r e m ; 
-         f o n t - w e i g h t :   7 0 0 ; 
-         m a r g i n - b o t t o m :   1 6 p x ; 
-         c o l o r :   v a r ( - - t e x t - p r i m a r y ) ; 
- } 
- 
- . w i z a r d - a c t i o n s   { 
-         d i s p l a y :   f l e x ; 
-         g a p :   1 2 p x ; 
- } 
- 
- @ k e y f r a m e s   s l i d e I n R i g h t   { 
-         f r o m   {   o p a c i t y :   0 ;   t r a n s f o r m :   t r a n s l a t e X ( 2 0 p x ) ;   } 
-         t o   {   o p a c i t y :   1 ;   t r a n s f o r m :   t r a n s l a t e X ( 0 ) ;   } 
- } 
- 
- / *   S t y l e d   S l i d e r   * / 
- . s t y l e d - s l i d e r   { 
-         - w e b k i t - a p p e a r a n c e :   n o n e ; 
-         w i d t h :   1 0 0 % ; 
-         h e i g h t :   8 p x ; 
-         b a c k g r o u n d :   r g b a ( 0 ,   0 ,   0 ,   0 . 0 5 ) ; 
-         b o r d e r - r a d i u s :   4 p x ; 
-         o u t l i n e :   n o n e ; 
-         t r a n s i t i o n :   v a r ( - - t r a n s i t i o n ) ; 
- } 
- 
- . s t y l e d - s l i d e r : : - w e b k i t - s l i d e r - t h u m b   { 
-         - w e b k i t - a p p e a r a n c e :   n o n e ; 
-         a p p e a r a n c e :   n o n e ; 
-         w i d t h :   2 4 p x ; 
-         h e i g h t :   2 4 p x ; 
-         b o r d e r - r a d i u s :   5 0 % ; 
-         b a c k g r o u n d :   v a r ( - - c o l o r - o r a n g e ) ; 
-         c u r s o r :   p o i n t e r ; 
-         b o x - s h a d o w :   0   2 p x   6 p x   v a r ( - - c o l o r - o r a n g e - g l o w ) ; 
-         t r a n s i t i o n :   t r a n s f o r m   0 . 1 s ; 
- } 
- 
- . s t y l e d - s l i d e r : : - w e b k i t - s l i d e r - t h u m b : a c t i v e   { 
-         t r a n s f o r m :   s c a l e ( 1 . 2 ) ; 
- } 
- 
- . s t y l e d - s l i d e r : : - m o z - r a n g e - t h u m b   { 
-         w i d t h :   2 4 p x ; 
-         h e i g h t :   2 4 p x ; 
-         b o r d e r - r a d i u s :   5 0 % ; 
-         b a c k g r o u n d :   v a r ( - - c o l o r - o r a n g e ) ; 
-         c u r s o r :   p o i n t e r ; 
-         b o x - s h a d o w :   0   2 p x   6 p x   v a r ( - - c o l o r - o r a n g e - g l o w ) ; 
-         b o r d e r :   n o n e ; 
- } 
-  
- 
+
+/* ==========================================================================
+   WIZARD & SLIDER STYLES
+   ========================================================================== */
+.wizard-container {
+    position: relative;
+    overflow: hidden;
+    min-height: 250px;
+}
+
+.wizard-step {
+    display: none;
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wizard-step.active {
+    display: block;
+}
+
+.wizard-step-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 12px;
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Styled Slider */
+.styled-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.styled-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-orange);
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--color-orange-glow);
+    transition: transform 0.1s;
+}
+
+.styled-slider::-webkit-slider-thumb:active {
+    transform: scale(1.2);
+}
+
+.styled-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-orange);
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--color-orange-glow);
+    border: none;
+}
+
 /* ==========================================================================
    DRUM PICKER STYLES
    ========================================================================== */
@@ -1285,6 +1591,7 @@ body {
     background: rgba(0,0,0,0.02);
     border-radius: 12px;
     border: 1px solid var(--bg-card-border);
+    margin-top: 14px;
     margin-bottom: 12px;
 }
 .drum-picker-container::before, .drum-picker-container::after {
@@ -1340,59 +1647,9 @@ body {
     font-weight: 700;
     color: var(--text-muted);
     scroll-snap-align: center;
-    transition: color 0.2s, font-size 0.2s;
+    transition: color 0.3s, font-size 0.3s;
 }
 .drum-picker-list li.active {
-    color: var(--text-primary);
-    font-size: 1.8rem;
-}
-
-/* ==========================================================================
-   FULLSCREEN MODAL STYLES
-   ========================================================================== */
-.fullscreen-modal {
-    align-items: flex-end;
-    padding: 0;
-}
-.fullscreen-content {
-    height: 90vh;
-    border-radius: 24px 24px 0 0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    padding: 30px 20px;
-}
-.close-fullscreen-btn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: rgba(0,0,0,0.05);
-    border: none;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    z-index: 10;
-}
-.fullscreen-wizard {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-/* WIZARD STEP STYLES */
-.wizard-step {
-    display: none;
-    animation: fadeIn 0.3s ease-out forwards;
-}
-.wizard-step.active {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    color: var(--primary-orange);
+    font-size: 1.6rem;
 }

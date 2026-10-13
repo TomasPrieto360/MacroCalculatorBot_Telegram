@@ -240,6 +240,22 @@ from flask import Flask, request, jsonify, render_template
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
+# Migración: Poner nombre "Tomás" al primer usuario existente sin nombre
+def migrar_nombre_tomas():
+    if col_usuarios is not None:
+        try:
+            # Buscar el primer usuario que NO tenga campo 'nombre' o lo tenga vacío
+            primer_sin_nombre = col_usuarios.find_one({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
+            if primer_sin_nombre:
+                uid = primer_sin_nombre["_id"]
+                col_usuarios.update_one({"_id": uid}, {"$set": {"nombre": "Tomás"}})
+                print(f"[INFO] Nombre 'Tomás' asignado al usuario con ID: {uid}")
+        except Exception as e:
+            print(f"[WARN] Error en migración de nombre: {e}")
+
+migrar_nombre_tomas()
+
+
 # Ruta base PWA (Servir App Móvil)
 @app.route('/')
 @app.route('/app')
@@ -252,7 +268,7 @@ def health():
     return jsonify({"status": "ok", "mongo": mongo_available}), 200
 
 # Endpoint API: Obtener lista de usuarios para el selector
-@app.route('/api/users')
+@app.route('/api/users', methods=['GET'])
 def api_get_users():
     users = []
     if col_usuarios is not None:
@@ -267,6 +283,32 @@ def api_get_users():
     if not users:
         users = [{"id": "defecto", "name": "Usuario Principal"}]
     return jsonify(users)
+
+# Endpoint API: Crear un nuevo usuario con nombre
+@app.route('/api/users', methods=['POST'])
+def api_create_user():
+    req_data = request.get_json() or {}
+    nombre = str(req_data.get("nombre", "")).strip()
+    if not nombre:
+        return jsonify({"status": "error", "message": "Se requiere un nombre"}), 400
+
+    # Generar ID único basado en el nombre (slug) + uuid corto
+    import re
+    slug = re.sub(r'[^a-z0-9]', '', nombre.lower())[:12] or "user"
+    new_id = f"{slug}_{str(uuid.uuid4())[:6]}"
+
+    # Crear usuario con valores por defecto
+    u_data = {
+        "_id": new_id,
+        "nombre": nombre,
+        "kcal": 0, "proteinas": 0, "carbos": 0, "grasas": 0, "fibra": 0, "sodio": 0,
+        "meta_proteinas": 160, "meta_kcal": 2000, "meta_carbos": 250, "meta_grasas": 65,
+        "racha_dias": 0, "historial_hoy": [], "historial_dias": [], "mis_alimentos": {}, "favoritos": {}, "perfil_fisico": {}
+    }
+    datos_usuarios[new_id] = u_data
+    save_user(new_id, u_data)
+
+    return jsonify({"status": "ok", "user_id": new_id, "nombre": nombre})
 
 # Endpoint API: Obtener datos completos de un usuario
 @app.route('/api/user/<user_id>')
@@ -337,7 +379,8 @@ def api_log_food(user_id):
         "id": item_id,
         "alimento": alimento,
         "cantidad_str": cantidad_str,
-        "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras
+        "kcal": kcal, "proteinas": prot, "carbos": carb, "grasas": gras,
+        "detalle_ia": stats.get("detalle_ia", "")
     }
     u_data["historial_hoy"].append(item)
     guardar_datos()
@@ -573,6 +616,44 @@ def api_delete_history_day(user_id, fecha):
         print(f"[ERROR] API delete-history-day: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Endpoint API: Editar fecha de un día del historial
+@app.route('/api/user/<user_id>/history-day/<fecha>', methods=['PUT'])
+def api_edit_history_day(user_id, fecha):
+    try:
+        req_data = request.get_json() or {}
+        nueva_fecha = str(req_data.get("nueva_fecha", "")).strip()
+        if not nueva_fecha:
+            return jsonify({"status": "error", "message": "Nueva fecha requerida"}), 400
+
+        u_data = datos_usuarios[user_id]
+        hist = u_data.get("historial_dias", [])
+        
+        # Check if new date already exists
+        for d in hist:
+            if d.get("fecha") == nueva_fecha:
+                return jsonify({"status": "error", "message": "Ya existe un registro para esa fecha"}), 400
+
+        for item in hist:
+            if item.get("fecha") == fecha:
+                item["fecha"] = nueva_fecha
+                break
+                
+        # Re-ordenar por fecha
+        u_data["historial_dias"] = sorted(hist, key=lambda x: x.get("fecha", ""), reverse=True)
+        racha = calcular_racha_usuario(u_data["historial_dias"])
+        u_data["racha_dias"] = racha
+        
+        guardar_datos()
+        return jsonify({
+            "status": "ok",
+            "racha_dias": racha,
+            "historial_dias": u_data["historial_dias"]
+        })
+    except Exception as e:
+        print(f"[ERROR] API edit-history-day: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Endpoint API: Favoritos del usuario
 @app.route('/api/user/<user_id>/favorites', methods=['GET', 'POST', 'DELETE'])
 def api_favorites(user_id):
@@ -776,7 +857,8 @@ def api_scan_meal_photo():
             '  "proteinas": 35.0,\n'
             '  "carbos": 40.0,\n'
             '  "grasas": 15.0,\n'
-            '  "confianza": "Alta"\n'
+            '  "confianza": "Alta",\n'
+            '  "detalle_ia": "Detalle detallado de los ingredientes identificados en el plato, indicando los gramos estimados de cada porción individual y las calorías y macros desglosadas por cada uno para dar transparencia. Ejemplo: 70g milanesa (150 kcal), 30g croqueta (80 kcal), 80g papa (70 kcal)..."\n'
             "}\n"
             "Solo responde con el objeto JSON. Sin código markdown adicional."
         )
